@@ -405,8 +405,9 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <script src="content.js?v=2026-09-19-1"></script>
 <!--CONTENT-END-->
 
-<!-- 云端同步层（数据存 GitHub 私有仓库，跟链接 / WorkBuddy 账号无关）· 2026-09-19 加 -->
-<script src="hub-sync.js?v=2026-09-19-1"></script>
+<!-- 云端同步层（数据存本机为主 + 同源加密备份，跟链接 / WorkBuddy 账号无关）· 2026-09-19 加
+     🔴 改了 hub-sync.js 必须同步换这里的 v= 号，否则浏览器用缓存、新版不生效（踩过） -->
+<script src="hub-sync.js?v=2026-09-19-2"></script>
 
 <script>
 /* ══ 约束红线 ══
