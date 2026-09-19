@@ -1,0 +1,1080 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<!-- build:2026-09-18-v2-local · daily-hub 工作台 · 第二版（本地版，无云端登录） -->
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f4f0e9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#191612" media="(prefers-color-scheme: dark)">
+<title>Notes · v2</title>
+<style>
+/* ══════════════════════════════════════════════════════════════
+   daily-hub · v2 工作台（本地版）
+   调色板沿用 v1 的 "Amber Ops"（暖纸 + 品牌橙）。
+   约束（红线，一律不改）：
+     ① 口令门保留，口令「我爱凌波」；
+     ② 云端表名 notes、字段名 day/kind/body/done 原样保留（本版虽走本机，
+        对象仍用这些键名，将来要接回云端无需改字段）。
+   v2 本地版变化：
+     ① 去掉云端登录：打开→输口令→直接进主界面，再无任何登录验证 /
+        邮箱验证码之类的挡路提示；
+     ② 数据全部走本机 localStorage（键名加 v2- 前缀，不与 v1 串）；
+     ③ 内联离线快照保留（SNAPSHOT 标记 + 任务数据），首次进入自动种入
+        本地任务列表，保证任何时候（断网 / 无登录）打开都能看到任务；
+     ④ 其余：口令门、七类记录、给爸消息、喝水浮层与 v1 一致。
+   ══════════════════════════════════════════════════════════════ */
+:root{
+  --page:#f4f0e9;
+  --shell:#fdfaf6;
+  --bg:#fffdfa;
+  --panel-2:#faf6f0;
+
+  --border:rgba(48,32,20,.07);
+  --border-2:rgba(48,32,20,.13);
+
+  --ink-1:#1f1710;
+  --ink-2:#4a3f34;
+  --ink-3:#7a6a59;
+
+  --accent:#D9642A;
+  --accent-deep:#B04E1E;
+  --accent-ink:#A8451A;
+  --accent-2:#2E6B63;
+  --accent-soft:rgba(217,100,42,.11);
+  --on-accent:#fffdfa;
+  --glow:rgba(217,100,42,.34);
+  --halo:rgba(217,100,42,.10);
+  --halo-panel:rgba(217,100,42,.16);
+
+  --up:#2F7A55;
+  --up-soft:rgba(47,122,85,.11);
+  --on-up:#fdfefd;
+  --down:#B03A32;
+  --down-soft:rgba(176,58,50,.10);
+  --warn:#B77A16;
+  --warn-soft:rgba(183,122,22,.12);
+
+  --shadow:0 1px 2px rgba(60,38,20,.06), 0 4px 12px -6px rgba(60,38,20,.10);
+  --shadow-lg:0 2px 4px rgba(60,38,20,.05), 0 40px 90px -50px rgba(60,38,20,.34);
+
+  --r-lg:28px; --r:18px; --r-sm:12px; --r-xs:9px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --page:#191612; --shell:#1f1a15; --bg:#29241e; --panel-2:#332c25;
+    --border:rgba(255,255,255,.08); --border-2:rgba(255,255,255,.15);
+    --ink-1:#f8f6f2; --ink-2:#cec5b5; --ink-3:#a39885;
+    --accent:#FF8A4C; --accent-deep:#FF8A4C; --accent-ink:#FFB588;
+    --accent-2:#63C795; --accent-soft:rgba(255,138,76,.14); --on-accent:#20160f;
+    --glow:rgba(255,138,76,.30); --halo:rgba(255,138,76,.09); --halo-panel:rgba(255,138,76,.11);
+    --up:#63C795; --up-soft:rgba(99,199,149,.13); --on-up:#191612;
+    --down:#E0705A; --down-soft:rgba(224,112,90,.13);
+    --warn:#E8A33D; --warn-soft:rgba(232,163,61,.14);
+    --shadow:0 1px 2px rgba(0,0,0,.32), 0 4px 12px -6px rgba(0,0,0,.40);
+    --shadow-lg:0 2px 4px rgba(0,0,0,.35), 0 40px 90px -50px rgba(0,0,0,.65);
+  }
+}
+
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+html,body{overflow-x:clip;touch-action:manipulation}
+
+body{
+  margin:0;
+  background-color:var(--page);
+  background-image:radial-gradient(760px 460px at 88% -14%, var(--halo), transparent 62%);
+  background-repeat:no-repeat;
+  color:var(--ink-1);
+  font:16px/1.65 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding:18px 16px calc(56px + env(safe-area-inset-bottom));
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ── 卡片 ─────────────────────────────────────────────── */
+.card{
+  background:var(--bg);
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  padding:18px;
+  box-shadow:var(--shadow);
+}
+
+/* ── 页头 ─────────────────────────────────────────────── */
+.hd{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:16px}
+.d1{font-size:23px;font-weight:600;letter-spacing:-.01em;line-height:1.25;overflow-wrap:anywhere;min-width:0}
+.d2{font-size:13px;color:var(--ink-3);margin-top:3px}
+.badge-today{display:inline-block;font-size:11px;font-weight:700;padding:1.5px 8px;
+  border-radius:7px;background:var(--accent-soft);color:var(--accent-ink);margin-left:7px;vertical-align:2px}
+.v2tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;
+  background:var(--accent-2);color:var(--on-up);margin-left:8px;vertical-align:3px;letter-spacing:.04em}
+.v1link{font-size:12px;color:var(--ink-3);text-decoration:none;border-bottom:1px dashed var(--border-2)}
+.v1link:hover{color:var(--accent-ink);border-color:var(--accent)}
+
+/* ── 完成度圆环 ───────────────────────────────────────── */
+.ring{width:52px;height:52px;flex:0 0 52px;position:relative}
+.ring svg{transform:rotate(-90deg)}
+.ring .bg{fill:none;stroke:var(--panel-2);stroke-width:4}
+.ring .fg{fill:none;stroke:var(--up);stroke-width:4;stroke-linecap:round;
+  transition:stroke-dashoffset .5s cubic-bezier(.3,.8,.4,1)}
+.ring .tx{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:700;color:var(--ink-3);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+
+/* ── 页签 ─────────────────────────────────────────────── */
+.tabs{display:flex;gap:4px;background:var(--bg);border:1px solid var(--border);
+  border-radius:var(--r-sm);padding:5px;margin-bottom:14px;box-shadow:var(--shadow);
+  overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+  font-size:15px;padding:0 14px;min-height:38px;border-radius:var(--r-xs);
+  color:var(--ink-3);cursor:pointer;white-space:nowrap;user-select:none;transition:background .18s,color .18s}
+.tab:hover{color:var(--ink-2);background:var(--panel-2)}
+.tab.on{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
+
+/* ── 小节标题 / 正文 ──────────────────────────────────── */
+.sec{font-size:12px;font-weight:700;color:var(--ink-3);margin:0 0 10px;letter-spacing:.02em}
+.bf{font-size:15px;line-height:1.7;white-space:pre-wrap;word-break:break-word;color:var(--ink-2)}
+.bf.struct{white-space:normal}
+.bf.struct>*:first-child{margin-top:0}
+.bf.struct .bh{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:700;
+  color:var(--ink-1);letter-spacing:.02em;margin:15px 0 8px}
+.bf.struct .bh::before{content:"";width:5px;height:5px;flex:0 0 5px;border-radius:50%;background:var(--accent)}
+.bf.struct .li{display:grid;grid-template-columns:18px minmax(0,1fr);gap:9px;margin-bottom:6px}
+.bf.struct .li>.n{font-size:12px;font-weight:700;color:var(--accent-ink);
+  font-variant-numeric:tabular-nums;line-height:1.7;text-align:right;padding-top:1px}
+.bf.struct .li>.t{min-width:0;word-break:break-word}
+.bf.struct .pt{margin:0 0 8px;word-break:break-word}
+.bf.struct .pt:last-child{margin-bottom:0}
+.ai-note{font-size:13px;color:var(--ink-2);line-height:1.7;background:var(--panel-2);
+  border:1px solid var(--border);border-radius:var(--r-sm);padding:12px 13px}
+
+/* ── 表单 ─────────────────────────────────────────────── */
+textarea{width:100%;min-height:110px;border:1px solid var(--border-2);border-radius:var(--r-sm);
+  padding:13px;font-size:16px;line-height:1.7;resize:vertical;background:var(--panel-2);
+  color:var(--ink-1);outline:none;font-family:inherit;transition:border-color .18s,box-shadow .18s}
+textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+textarea::placeholder{color:var(--ink-3)}
+#amt{width:130px;border:1px solid var(--border-2);border-radius:var(--r-sm);padding:11px 12px;
+  font-size:16px;background:var(--panel-2);color:var(--ink-1);outline:none;font-family:inherit;
+  font-variant-numeric:tabular-nums;transition:border-color .18s,box-shadow .18s}
+#amt:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+
+.row{display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap}
+.save{font-size:15px;border:none;border-radius:var(--r-sm);padding:0 26px;min-height:44px;
+  background:var(--accent-deep);color:var(--on-accent);font-weight:700;cursor:pointer;
+  box-shadow:0 1px 2px rgba(60,38,20,.12), 0 8px 22px -8px var(--glow);transition:transform .15s,box-shadow .2s,opacity .15s}
+.save:hover{box-shadow:0 1px 2px rgba(60,38,20,.14), 0 12px 30px -8px var(--glow)}
+.save:active{transform:scale(.975)}
+.save:disabled{opacity:.45;box-shadow:none;cursor:default}
+.msg{font-size:13px;color:var(--ink-3);min-height:19px;margin-top:9px}
+.err{color:var(--down)}
+.hint{font-size:12px;color:var(--ink-3);margin-top:13px;line-height:1.75}
+
+/* ── 翻页条 ───────────────────────────────────────────── */
+.bar2{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:11px}
+.nav{background:var(--bg);border:1px solid var(--border);padding:0 14px;min-height:40px;
+  font-size:13px;border-radius:var(--r-sm);color:var(--ink-2);cursor:pointer;transition:background .15s,color .15s,border-color .15s}
+.nav:hover:not(:disabled){border-color:var(--border-2);color:var(--ink-1)}
+.nav:disabled{opacity:.32;cursor:default}
+.nav.on{background:var(--up-soft);color:var(--up);border-color:transparent;font-weight:600}
+.cnt{font-size:13px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+
+/* ── 列表 ─────────────────────────────────────────────── */
+ul{list-style:none;margin:0;padding:0}
+li{display:flex;gap:11px;align-items:flex-start;padding:12px 0;border-top:1px solid var(--border);animation:fade .22s ease}
+li:first-child{border-top:none}
+@keyframes fade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.tm{font-size:12px;color:var(--ink-3);flex:0 0 42px;padding-top:3px;font-variant-numeric:tabular-nums}
+.bd{flex:1;min-width:0;white-space:pre-wrap;word-break:break-word;color:var(--ink-2)}
+li.done .bd{color:var(--ink-3);text-decoration:line-through;text-decoration-thickness:1px}
+
+.ck{flex:0 0 auto;width:24px;height:24px;border:1.5px solid var(--border-2);border-radius:8px;
+  background:var(--bg);margin-top:1px;cursor:pointer;position:relative;transition:.16s}
+.ck::before{content:"";position:absolute;inset:-10px}
+.ck:hover{border-color:var(--accent)}
+.ck.on{background:var(--up);border-color:var(--up);box-shadow:0 1px 2px rgba(60,38,20,.12), 0 4px 12px -4px var(--up-soft)}
+.ck.on:hover{background:var(--up)}
+.ck.on::after{content:"";position:absolute;left:7.5px;top:3.5px;width:6px;height:11px;
+  border:solid var(--on-up);border-width:0 2px 2px 0;animation:tick .22s cubic-bezier(.2,1.4,.5,1) both}
+@keyframes tick{from{transform:rotate(45deg) scale(.4);opacity:0}to{transform:rotate(45deg) scale(1);opacity:1}}
+
+.st{flex:0 0 auto;position:relative;font-size:12px;font-weight:700;padding:5px 11px;min-height:30px;
+  display:inline-flex;align-items:center;border-radius:var(--r-xs);cursor:pointer;
+  background:var(--panel-2);color:var(--ink-3);border:1px solid var(--border-2);transition:.15s}
+.st:active{transform:scale(.97)}
+.st.s1{background:var(--accent-soft);color:var(--accent-ink);border-color:transparent}
+.st.s2{background:var(--accent-deep);color:var(--on-accent);border-color:transparent}
+.st.s3{background:var(--up-soft);color:var(--up);border-color:transparent}
+.st.s4{background:var(--down-soft);color:var(--down);border-color:transparent}
+
+.amt{flex:0 0 auto;font-variant-numeric:tabular-nums;font-weight:700;color:var(--ink-1)}
+.x{flex:0 0 auto;position:relative;color:var(--ink-3);font-size:19px;line-height:1;
+  padding:8px 10px;background:none;border:none;cursor:pointer;transition:color .15s}
+.x::before{content:"";position:absolute;inset:-2px}
+.x:hover{color:var(--down)}
+.empty{font-size:14px;color:var(--ink-3);padding:16px 2px;text-align:center}
+
+/* ── 每日例行 ─────────────────────────────────────────── */
+.rt{display:flex;gap:11px;align-items:center;padding:11px 13px;background:var(--panel-2);
+  border:1px solid var(--border);border-radius:var(--r-sm);margin-bottom:7px;animation:fade .22s ease}
+.rt:first-child{margin-top:0}
+.rt .bar{width:6px;height:6px;flex:0 0 6px;border-radius:50%;background:var(--accent)}
+.rt .tx{flex:1;min-width:0;font-size:15px;line-height:1.55;color:var(--ink-2)}
+.rt .add{flex:0 0 auto;font-size:13px;font-weight:700;padding:0 13px;min-height:34px;
+  border-radius:var(--r-xs);border:1px solid var(--border-2);background:var(--bg);color:var(--ink-2);cursor:pointer;transition:.15s}
+.rt .add:hover{border-color:var(--accent);color:var(--accent-ink);background:var(--accent-soft)}
+.rt .add:disabled{opacity:.5;cursor:default}
+
+/* ── 老想法回捞 ───────────────────────────────────────── */
+.old{display:flex;gap:10px;align-items:flex-start;padding:11px 0;border-top:1px solid var(--border)}
+.old:first-child{border-top:none;padding-top:2px}
+.old .od{font-size:12px;color:var(--ink-3);flex:0 0 46px;padding-top:3px;font-variant-numeric:tabular-nums}
+.old .ob{flex:1;min-width:0;font-size:14px;line-height:1.55;white-space:pre-wrap;word-break:break-word;color:var(--ink-2)}
+.old .obt{display:flex;gap:7px;flex:0 0 auto}
+.old .obt button{font-size:12px;padding:0 10px;min-height:32px;border-radius:var(--r-xs);
+  border:1px solid var(--border-2);background:var(--bg);color:var(--ink-2);cursor:pointer;transition:.15s}
+.old .obt button:hover{border-color:var(--accent);color:var(--accent-ink);background:var(--accent-soft)}
+
+/* ── 口令 ─────────────────────────────────────────────── */
+#gate{max-width:380px;margin:13vh auto 0}
+#gate .card{padding:24px}
+#gate h1{font-size:20px;font-weight:600;margin:0 0 4px;letter-spacing:-.01em}
+#gate .sub{font-size:13px;color:var(--ink-3);margin-bottom:18px;line-height:1.65}
+#pw{width:100%;border:1px solid var(--border-2);border-radius:var(--r-sm);padding:12px;
+  font-size:16px;background:var(--panel-2);color:var(--ink-1);outline:none;font-family:inherit;
+  margin-bottom:10px;transition:border-color .18s,box-shadow .18s}
+#pw:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+#app > *{animation:rise .4s cubic-bezier(.22,.61,.36,1) both}
+#app > *:nth-child(2){animation-delay:.05s}
+
+/* ── 桌面：两栏工作台 ─────────────────────────────────── */
+@media (min-width:900px){
+  body{padding:26px 26px calc(44px + env(safe-area-inset-bottom))}
+  #app{max-width:1180px;margin:0 auto;position:relative;overflow:clip;
+    background:var(--shell);border:1px solid var(--border);border-radius:var(--r-lg);
+    padding:26px 30px 38px;box-shadow:var(--shadow-lg)}
+  #app::before{content:"";position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(340px 240px at 92% -8%, var(--halo-panel), transparent 62%)}
+  .main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+  textarea{min-height:168px}
+  .tab{flex:1}
+}
+@media (max-width:899px){
+  .tabs{position:sticky;top:8px;z-index:6}
+}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-delay:0s!important;transition-duration:.001ms!important}
+}
+@media (max-width:480px){
+  body{padding:14px 12px calc(48px + env(safe-area-inset-bottom))}
+  .card{padding:15px}
+  .d1{font-size:21px}
+  .tab{font-size:14px;padding:0 11px}
+  textarea{min-height:150px;font-size:16px}
+  #amt{width:120px}
+}
+@media (max-width:360px){
+  body{padding:14px 12px calc(52px + env(safe-area-inset-bottom))}
+  .tab{font-size:13px;padding:0 10px}
+  .d1{font-size:21px}
+}
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <div class="card">
+    <h1>Notes · v2</h1>
+    <div class="sub">输入口令进入</div>
+    <input id="pw" type="password" placeholder="Passcode" autocomplete="current-password">
+    <div class="row"><button class="save" id="unlock" style="width:100%">进入</button></div>
+    <div class="msg err" id="gmsg"></div>
+  </div>
+</div>
+
+<div id="app" hidden>
+  <div class="hd">
+    <div>
+      <div class="d1"><span id="d1"></span><span class="v2tag">v2</span></div>
+      <div class="d2" id="d2"></div>
+    </div>
+    <div class="ring" id="ringbox">
+      <svg viewBox="0 0 36 36" width="50" height="50">
+        <circle class="bg" cx="18" cy="18" r="15.5"></circle>
+        <circle class="fg" id="ringfg" cx="18" cy="18" r="15.5"
+                stroke-dasharray="97.4" stroke-dashoffset="97.4"></circle>
+      </svg>
+      <div class="tx" id="ringtx"></div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <span class="tab on" data-kind="task">任务</span>
+    <span class="tab" data-kind="think">心得</span>
+    <span class="tab" data-kind="idea">想法</span>
+    <span class="tab" data-kind="job">面试</span>
+    <span class="tab" data-kind="money">记账</span>
+    <span class="tab" data-kind="do">可做</span>
+    <span class="tab" data-kind="backlog">待办</span>
+  </div>
+
+  <div class="card" id="backcard" hidden style="margin-bottom:14px;padding-bottom:12px">
+    <div class="sec">以前丢进来、还没处理的（怕你忘，给你捞出来）</div>
+    <div id="bk"></div>
+  </div>
+
+  <div class="card" id="mscard" hidden style="margin-bottom:14px">
+    <div class="sec">花了多少</div>
+    <div class="bf" id="ms"></div>
+  </div>
+
+  <div class="card" id="bfcard" hidden style="margin-bottom:14px">
+    <div class="sec">我给你写的总结</div>
+    <div class="bf struct" id="bf"></div>
+  </div>
+
+  <div class="card" id="rtcard" hidden style="margin-bottom:14px;padding-bottom:12px">
+    <div class="sec">每日例行</div>
+    <ul id="rt"></ul>
+  </div>
+
+  <div class="card" id="dadcard" hidden style="margin-bottom:14px">
+    <div class="sec">给爸发消息（我帮你写好了，复制发就行）</div>
+    <div id="dadmorning" class="bf" style="margin-bottom:9px"></div>
+    <div class="row" style="margin:0 0 14px">
+      <button class="save" id="copym" style="padding:8px 18px;font-size:14px">复制早安</button>
+      <button class="nav" id="sentm" style="font-size:13px">早安已发</button>
+    </div>
+    <div id="dadevening" class="bf" style="margin-bottom:9px"></div>
+    <div class="row" style="margin:0">
+      <button class="save" id="copye" style="padding:8px 18px;font-size:14px">复制晚安</button>
+      <button class="nav" id="sente" style="font-size:13px">晚安已发</button>
+    </div>
+  </div>
+
+  <!-- 离线快照回退卡：任务列表为空时显示（内联，断网/无登录都能看） -->
+  <div class="card" id="snapcard" hidden style="margin-bottom:14px">
+    <div class="sec">今日预置任务（离线快照 · 内联，任何时候都能看）</div>
+<!--SNAPSHOT-START-->
+    <ul id="snapul" style="list-style:none;padding:0;margin:0;text-align:left;font-size:13.5px;line-height:1.85"></ul>
+<!--SNAPSHOT-END-->
+  </div>
+
+  <div class="main">
+    <!-- 左栏：记录区（输入 + 当天翻页） -->
+    <div class="card">
+      <div id="ainote" class="ai-note" hidden>
+        今天的任务是早上我帮你写好的，你只管勾。<br>临时要加的，点下面「自己加一条」。
+      </div>
+      <div id="amtrow" hidden style="display:flex;gap:10px;margin-bottom:10px">
+        <input id="amt" type="number" inputmode="decimal" placeholder="金额" step="0.01">
+        <span style="flex:1;font-size:13px;color:var(--ink-3);align-self:center">元 · 后面那框写买了啥</span>
+      </div>
+      <textarea id="txt"></textarea>
+      <div class="row">
+        <button class="save" id="save">记下</button>
+        <button class="nav" id="selfta" hidden>自己加一条</button>
+        <span class="hint" id="kbd" style="margin:0"></span>
+      </div>
+      <div class="msg" id="m"></div>
+    </div>
+
+    <!-- 右栏：当天列表 -->
+    <div>
+      <div class="bar2">
+        <button class="nav" id="prev">前一天</button>
+        <span class="cnt" id="c"></span>
+        <button class="nav" id="next">后一天</button>
+      </div>
+      <div class="card"><ul id="list"></ul></div>
+    </div>
+  </div>
+
+  <div class="hint">
+    手机和电脑打开同一个链接，内容是同一份（都存在本机）。<br>
+    这是 <b>v2</b> 工作台（本地版，无需登录），想回 v1 点 <a class="v1link" href="index.html.v1-backup-20260918-2200">这里</a>。
+  </div>
+</div>
+
+<!--CONTENT-START-->
+<!-- 内容区边界：今日任务 / 待办 / 给爸消息 / 每日例行 等文字，以后只改 v2/content.js（WorkBuddy 负责），别动本文件 -->
+<script src="content.js?v=2026-09-19-1"></script>
+<!--CONTENT-END-->
+
+<!-- 云端同步层（数据存 GitHub 私有仓库，跟链接 / WorkBuddy 账号无关）· 2026-09-19 加 -->
+<script src="hub-sync.js?v=2026-09-19-1"></script>
+
+<script>
+/* ══ 约束红线 ══
+   ① 口令门保留，口令 = 「我爱凌波」；
+   ② 云端表名 notes、字段名 day/kind/body/done 一律不改（本版走本机，
+      但存储对象仍用这些键名，将来接回云端无需改字段）。
+   本版：去掉云端登录与 SDK，数据全部走 localStorage（v2- 前缀），
+        输口令后直接进主界面。 */
+const PASS = '我爱凌波';
+const KEY  = 'v2-ok';
+
+/* 内容边界：文字类（今日任务 / 给爸消息 / 例行 / 待办）来自 **云端 data.json 的 content 字段**
+   （本地 content.js 只是空壳兜底，因为页面托管在公开仓库、内容不能公开）。
+   编程（结构/逻辑/样式）别动这里；要改文案 = 改私有数据仓 data.json 的 content 段。 */
+let CONT = window.CONTENT || { snapshotTasks: [], dad: { morning:'', evening:'' }, routines: [], backlogSeeds: [] };
+let DADMSG = CONT.dad, SNAP_TASKS = CONT.snapshotTasks, DEFAULT_ROUTINES = CONT.routines;
+/* 云端拉回内容后由同步层调用：把新内容接上（重画前调用即可） */
+window.__HUB_APPLY_CONTENT = function (c) {
+  if (!c) return;
+  try {
+    CONT = Object.assign({}, CONT, c);
+    if (c.dad) DADMSG = CONT.dad;
+    if (c.snapshotTasks) SNAP_TASKS = CONT.snapshotTasks;
+    if (c.routines) DEFAULT_ROUTINES = CONT.routines;
+  } catch (e) {}
+};
+
+const LS = {
+  notes:   'v2-notes',
+  spend:   'v2-spend',
+  dotasks: 'v2-dotasks',
+  routines:'v2-routines'
+};
+
+function loadArr(k){ try { return JSON.parse(localStorage.getItem(k) || '[]'); } catch(e){ return []; } }
+function saveArr(k, a){
+  try { localStorage.setItem(k, JSON.stringify(a)); } catch(e){}
+  /* 本地写完立刻同步到云端（GitHub 私有仓库）—— 这样换链接/换设备数据都不丢 */
+  try { if (window.HUBSYNC) window.HUBSYNC.touch(); } catch(e){}
+}
+let _seq = 0;
+function newId(){ return 'v2-' + Date.now().toString(36) + '-' + (_seq++).toString(36); }
+
+/* ── 本地「云」替身 ──
+   实现 from / select / insert / update / delete / eq / order / limit，
+   全部读写 localStorage，对象保留 day/kind/body/done(+tag/+created_at)。
+   上层 render/save 逻辑与 v1 完全一致；将来要接回云端，只需把本对象换掉。 */
+function makeQuery(table){
+  const key = LS[table];
+  let filters = [], orderBy = null, limitN = null, op = null, opData = null;
+  const q = {
+    eq(f, v){ filters.push({ f, v }); return q; },
+    order(f, o){ orderBy = { f, asc: !(o && o.ascending === false) }; return q; },
+    limit(n){ limitN = n; return q; },
+    insert(obj){ op = 'insert'; opData = obj; return q; },
+    update(obj){ op = 'update'; opData = obj; return q; },
+    del(){ op = 'delete'; return q; },
+    select(){ if (!op) op = 'select'; return q; },
+    then(resolve){
+      (async () => {
+        try {
+          let arr = loadArr(key), res;
+          if (op === 'insert'){
+            const items = Array.isArray(opData) ? opData : [opData];
+            const now = new Date().toISOString();
+            const added = items.map(it => { const r = Object.assign({}, it); if (!r.id) r.id = newId(); if (!r.created_at) r.created_at = now; return r; });
+            arr = arr.concat(added); saveArr(key, arr); res = { data: added, error: null };
+          } else if (op === 'update'){
+            const matched = arr.filter(r => filters.every(f => r[f.f] === f.v));
+            matched.forEach(r => Object.assign(r, opData)); saveArr(key, arr); res = { data: matched, error: null };
+          } else if (op === 'delete'){
+            const keep = arr.filter(r => !(filters.every(f => r[f.f] === f.v)));
+            saveArr(key, keep); res = { data: keep, error: null };
+          } else {
+            let rows = arr;
+            for (const f of filters) rows = rows.filter(r => r[f.f] === f.v);
+            if (orderBy) rows = rows.slice().sort((a,b) => { const x=a[orderBy.f], y=b[orderBy.f]; if (x<y) return orderBy.asc?-1:1; if (x>y) return orderBy.asc?1:-1; return 0; });
+            if (limitN != null) rows = rows.slice(0, limitN);
+            res = { data: rows, error: null };
+          }
+          resolve(res);
+        } catch(e){ resolve({ data: null, error: e }); }
+      })();
+    }
+  };
+  return q;
+}
+const cloud = {
+  database: { from: t => makeQuery(t) },
+  auth: { getSession: async () => ({ data: null, error: null }), refreshSession: async () => ({ data: null, error: null }) }
+};
+
+const $ = id => document.getElementById(id);
+const pad = n => String(n).padStart(2,'0');
+const ymd = d => d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const shift = (s,n) => { const [y,m,d]=s.split('-').map(Number); return ymd(new Date(y,m-1,d+n)); };
+const WD = ['周日','周一','周二','周三','周四','周五','周六'];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function fmtBrief(t){
+  const out = []; let buf = [];
+  const flush = () => {
+    if (!buf.length) return;
+    out.push('<p class="pt">' + esc(buf.join('\n')).replace(/\n/g,'<br>') + '</p>');
+    buf = [];
+  };
+  for (const raw of String(t || '').split('\n')){
+    const s = raw.replace(/\s+$/,'');
+    if (!s.trim()){ flush(); continue; }
+    const h = s.match(/^\s*[^\s\d][^：:]{0,15}[：:]\s*$/);
+    if (h){ flush(); out.push('<div class="bh">' + esc(s.trim().replace(/[：:]$/,'')) + '</div>'); continue; }
+    const n = s.match(/^\s*(\d{1,2})[.、)]\s*(.+)$/);
+    if (n){ flush(); out.push('<div class="li"><span class="n">' + n[1] + '</span><span class="t">' + esc(n[2].trim()) + '</span></div>'); continue; }
+    const b = s.match(/^\s*[-•·*]\s+(.+)$/);
+    if (b){ flush(); out.push('<div class="li"><span class="n">·</span><span class="t">' + esc(b[1].trim()) + '</span></div>'); continue; }
+    buf.push(s.trim());
+  }
+  flush();
+  return out.join('');
+}
+
+const PH = {
+  task:  '临时加一条任务…',
+  think: '心里怎么想的、想明白了什么、今天过得怎么样…\n（点输入框，用输入法上的话筒可以直接说话）',
+  idea:  '突然想到的，先丢进来，不用想清楚…',
+  job:   '一行一个：公司 岗位\n只记去面过试的，海投的不用记',
+  money: '买了啥 / 花在哪',
+  do:    '加一项每日可做…\n比如：打字练习 10 分钟',
+  backlog:'以后有空才做的事…\n一行一个，想到了就丢进来'
+};
+const SV = { task:'加一条', think:'记下', idea:'丢进来', job:'记下', money:'记一笔', do:'加上', backlog:'记下来' };
+const EMPTY = { task:'今天还没安排任务', think:'还没写心得', idea:'还没丢想法',
+                job:'还没记面试', money:'今天还没记账', do:'还没有可做项，左边加一个',
+                backlog:'还没有未落地待办，左边加一个' };
+const STS = ['待面','已面','二面','过了','挂了'];
+
+/* 内容（今日任务 / 给爸消息 / 例行）来自 CONT —— 已在上面声明为 let，可由云端热更新。 */
+
+/* 把内联离线快照（今日预置任务）渲染进 #snapul（内容来自 CONTENT.snapshotTasks） */
+function renderSnap(){
+  const ul = $('snapul'); if (!ul) return;
+  ul.innerHTML = '';
+  (SNAP_TASKS || []).forEach(b => {
+    const li = document.createElement('li');
+    li.innerHTML = '<span class="mk">○</span>' + esc(b);
+    ul.appendChild(li);
+  });
+}
+
+let cur = ymd(new Date());
+const today = cur;
+let kind = 'task';
+
+function setMsg(t, bad){ const m=$('m'); m.textContent=t||''; m.className = bad ? 'msg err' : 'msg'; }
+function errText(e){
+  if (!e) return '未知错误';
+  if (typeof e === 'string') return e;
+  return [e.message, e.hint, e.details, e.code, e.name].filter(Boolean).join(' · ') || JSON.stringify(e);
+}
+
+/* ── 内容版本机制（内容改了要能自动生效）───────────────────────────
+   content.js 顶部有 version 字段；本地记住「上次生效的内容签名」。
+   签名 = version + 文案指纹 —— 所以就算忘了换 version，只要文案改了也会自动生效。
+   签名不一致（含首次进入）→ 自动把新的 snapshotTasks / backlogSeeds 合并进来。
+   合并铁律（保守，绝不丢用户的数据）：
+     ① 已经勾完的（done=true）  → 不删、不改；
+     ② 你自己写的（非预置条目） → 不删、不改；
+     ③ 只有「还没勾的预置条目」 → 允许被新版替换成新内容。
+   dad / routines 不是列表，直接以 content.js 为准（覆盖）。
+   ──────────────────────────────────────────────────────────────── */
+const VER_KEY    = 'v2-content-version';  // 本地记住的内容签名
+const SEED_TAG   = 'seed';                // 预置条目标记（写在 notes 的 tag 字段上）
+const SEED_TEXTS = 'v2-seed-texts';       // 历史种入过的预置文案（兜底识别旧版种下的预置）
+
+function contentSig(){
+  const v = (CONT && CONT.version) ? String(CONT.version) : '';
+  const raw = (CONT.snapshotTasks || []).join('') + ''
+            + (CONT.backlogSeeds || []).join('');
+  let h = 0;
+  for (let i = 0; i < raw.length; i++) h = ((h << 5) - h + raw.charCodeAt(i)) | 0;
+  return v + '|' + h;
+}
+function loadSeedTexts(){
+  try { const a = JSON.parse(localStorage.getItem(SEED_TEXTS) || '[]'); return Array.isArray(a) ? a : []; }
+  catch(e){ return []; }
+}
+function saveSeedTexts(a){ try { localStorage.setItem(SEED_TEXTS, JSON.stringify((a||[]).slice(-800))); } catch(e){} }
+
+/* 保守合并：把 newTexts 作为「预置条目」合并进某一类列表 */
+function mergePresets(notes, kindName, dayVal, newTexts, history){
+  const list = Array.isArray(newTexts) ? newTexts : [];
+  const isNew = {}; list.forEach(b => { isNew[b] = true; });
+  const kept = [];
+  (notes || []).forEach(n => {
+    if (n.kind !== kindName || n.day !== dayVal){ kept.push(n); return; }
+    const preset = (n.tag === SEED_TAG) || (n.tag == null && history.indexOf(n.body) >= 0);
+    if (preset && n.done !== true) return;                 // 还没勾的预置 → 让位给新内容
+    if (n.tag == null && isNew[n.body]) n.tag = SEED_TAG;   // 补打预置标记，便于以后识别
+    kept.push(n);                                          // 已勾完 / 自己写的 → 原样保留
+  });
+  const seen = {}; const added = [];
+  kept.forEach(n => { if (n.kind === kindName && n.day === dayVal) seen[n.body] = true; });
+  const now = new Date().toISOString();
+  list.forEach(b => {
+    if (!b || seen[b]) return;
+    seen[b] = true;
+    kept.push({ id: newId(), day: dayVal, kind: kindName, body: b, done: false, tag: SEED_TAG, created_at: now });
+    added.push(b);
+  });
+  return { notes: kept, added: added };
+}
+
+function seedIfNeeded(){
+  const sig  = contentSig();
+  const last = localStorage.getItem(VER_KEY) || '';
+  let history = loadSeedTexts();
+  const firstRun = (last === '') || (history.length === 0);   // 从未跑过机制，或被旧版种下过且历史记录缺失 → 认领旧预置为基线
+
+  /* —— 一键迁移（首次跑机制，或历史记录缺失时）：认领本机历史上被旧版种入的预置条目，作为基线。
+     否则老设备上的旧预置任务没有 tag 标记、history 也是空的，版本变更后永远识别不出、
+     清不掉（表现为"内容改了但页面还是旧的"）。
+     做法：把今天任务 / 待办里「没标记过的」按预置认领（打 SEED_TAG + 并入 history）。
+     说明：认领只在这一次发生；之后用户自建的条目（tag=null 且不在 history）
+           不会被误删，保守规则依然成立。 */
+  if (firstRun){
+    const notes = loadArr(LS.notes);
+    let dirty = false;
+    notes.forEach(n => {
+      if ((n.kind === 'task' && n.day === today) || n.kind === 'backlog'){
+        if (n.tag == null){ n.tag = SEED_TAG; dirty = true; }
+        if (history.indexOf(n.body) < 0) history.push(n.body);
+      }
+    });
+    if (dirty) saveArr(LS.notes, notes);
+    saveSeedTexts(history);
+  }
+
+  const changed = (last !== sig);   // 版本/文案变了，或首次进入
+
+  /* ① 每日例行：直接以 content.js 为准（签名变化或首次 → 重建；同名条目保留原 active） */
+  let rt = loadArr(LS.routines);
+  if ((changed || !rt.length) && (CONT.routines || []).length){
+    const keep = {}; rt.forEach(r => { keep[r.body] = (r.active !== false); });
+    const now = new Date().toISOString();
+    rt = CONT.routines.map(r => ({ id: newId(), body: r.body, dow: r.dow,
+                                   active: keep[r.body] !== false, created_at: now }));
+    saveArr(LS.routines, rt);
+  }
+
+  /* ② 今日任务 + 待办预设：保守合并（已勾完的、自己写的一律不动） */
+  if (changed){
+    const notes = loadArr(LS.notes);
+    const a = mergePresets(notes, 'task', today, CONT.snapshotTasks, history);
+    const b = mergePresets(a.notes, 'backlog', 'backlog', CONT.backlogSeeds, history);
+    saveArr(LS.notes, b.notes);
+    history = history.concat(a.added, b.added);
+    saveSeedTexts(history);
+  }
+
+  /* ③ 记住本次生效的内容签名 */
+  try { localStorage.setItem(VER_KEY, sig); } catch(e){}
+}
+
+/* 口令门 → 直接进主界面（无云端登录、无登录态校验、无任何登录提示） */
+$('unlock').onclick = () => {
+  if ($('pw').value !== PASS) { $('gmsg').textContent = '口令不对'; $('pw').value=''; return; }
+  localStorage.setItem(KEY,'1');
+  enter();
+};
+$('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('unlock').click(); });
+
+function enter(){
+  $('gate').hidden = true; $('app').hidden = false;
+  /* 云端同步：把「重画」暴露给同步层（拉回云端数据后要重画一次），再去连云端。
+     没配对 token 时直接本地渲染 —— 页面照常能用，只是数据只在本机。 */
+  window.__HUB_RENDER = function(){ try { seedIfNeeded(); } catch(e){} render(); };
+  syncTab(); renderSnap();
+  if (window.HUBSYNC && window.HUBSYNC.hasToken()) { window.HUBSYNC.boot(); }
+  else { window.__HUB_RENDER(); }
+}
+if (localStorage.getItem(KEY) === '1') enter();
+
+/* 渲染 */
+function syncTab(){
+  const isTask = kind === 'task';
+  $('ainote').hidden = !isTask;
+  $('txt').hidden = isTask;
+  $('save').hidden = isTask;
+  $('selfta').hidden = !isTask;
+  $('amtrow').hidden = kind !== 'money';
+  $('txt').placeholder = PH[kind];
+  $('save').textContent = SV[kind];
+  $('bfcard').hidden = true; $('rtcard').hidden = true;
+  $('backcard').hidden = true; $('mscard').hidden = true; $('snapcard').hidden = true;
+  const hasDad = !!(DADMSG && (DADMSG.morning || DADMSG.evening));
+  $('dadcard').hidden = !(isTask && hasDad);
+  if (isTask || kind === 'think') $('bfcard').hidden = false;
+  if (isTask) $('rtcard').hidden = false;
+  if (kind === 'idea') $('backcard').hidden = false;
+  if (kind === 'money') $('mscard').hidden = false;
+}
+$('selfta').onclick = () => { $('txt').hidden = false; $('save').hidden = false; $('txt').focus(); };
+
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
+  t.classList.add('on'); kind = t.dataset.kind; syncTab(); render();
+});
+
+function head(){
+  const [y,m,d] = cur.split('-').map(Number);
+  const dt = new Date(y,m-1,d);
+  $('d1').textContent = m + '月' + d + '日';
+  $('d2').innerHTML = y + '年 ' + WD[dt.getDay()] +
+    (cur === today ? '<span class="badge-today">今天</span>' : '');
+}
+function ring(done, total){
+  const C = 97.4;
+  if (kind !== 'task' || !total){
+    $('ringbox').style.opacity = 0;
+    $('ringfg').style.strokeDashoffset = C; $('ringtx').textContent = '';
+    return;
+  }
+  $('ringbox').style.opacity = 1;
+  $('ringfg').style.strokeDashoffset = C * (1 - done/total);
+  $('ringtx').textContent = done + '/' + total;
+}
+
+async function loadBrief(){
+  const y = shift(cur,-1);
+  const { data } = await cloud.database.from('notes').select('body')
+    .eq('day', y).eq('kind', 'sum').order('created_at', { ascending: true });
+  const rows = data || [];
+  if (rows.length) {
+    $('bf').innerHTML = fmtBrief(rows.map(r => r.body).join('\n\n'));
+    $('bfcard').hidden = false;
+  } else {
+    $('bf').innerHTML = '';
+    $('bfcard').hidden = !(kind === 'task' || kind === 'think');
+  }
+}
+
+async function loadRoutines(){
+  const [y,m,d] = cur.split('-').map(Number);
+  const dow = new Date(y,m-1,d).getDay();
+  const { data } = await cloud.database.from('routines').select('id,body,dow').eq('active', true);
+  const ul = $('rt'); ul.innerHTML = '';
+  const hit = (data||[]).filter(r => r.dow === '*' || r.dow.split(',').map(Number).indexOf(dow) >= 0);
+  $('rtcard').hidden = hit.length === 0;
+  hit.forEach(r => {
+    const li = document.createElement('li'); li.className = 'rt';
+    const bar = document.createElement('span'); bar.className = 'bar';
+    const tx = document.createElement('span'); tx.className = 'tx'; tx.textContent = r.body;
+    const add = document.createElement('button'); add.className = 'add'; add.textContent = '加入任务';
+    add.onclick = async () => {
+      add.disabled = true; add.textContent = '已加';
+      await cloud.database.from('notes').insert({ day: cur, kind: 'task', body: r.body }).select();
+      if (kind === 'task') render();
+    };
+    li.append(bar, tx, add); ul.appendChild(li);
+  });
+}
+
+async function loadBack(){
+  if (kind !== 'idea') return;
+  const { data } = await cloud.database.from('notes')
+    .select('id,day,body,created_at').eq('kind','idea').eq('done', false)
+    .order('day', { ascending: false }).limit(200);
+  const old = (data||[]).filter(r => r.day < today);
+  const box = $('bk'); box.innerHTML = '';
+  if (!old.length){ $('backcard').hidden = true; return; }
+  $('backcard').hidden = false;
+  old.slice(0, 15).forEach(r => {
+    const d = document.createElement('div'); d.className = 'old';
+    const od = document.createElement('span'); od.className = 'od'; od.textContent = r.day.slice(5).replace('-', '/');
+    const ob = document.createElement('span'); ob.className = 'ob'; ob.textContent = r.body;
+    const bt = document.createElement('span'); bt.className = 'obt';
+    const b1 = document.createElement('button'); b1.textContent = '捞回今天';
+    b1.onclick = async () => { await cloud.database.from('notes').update({ day: today }).eq('id', r.id); render(); };
+    const b2 = document.createElement('button'); b2.textContent = '算了';
+    b2.onclick = async () => { await cloud.database.from('notes').update({ done: true }).eq('id', r.id); render(); };
+    bt.append(b1, b2); d.append(od, ob, bt); box.appendChild(d);
+  });
+}
+
+async function loadMoney(){
+  if (kind !== 'money') return;
+  const { data } = await cloud.database.from('spend')
+    .select('day,amount').order('day', { ascending: false }).limit(1000);
+  const rows = data || [];
+  const ym = cur.slice(0, 7);
+  const mo = rows.filter(r => r.day.slice(0,7) === ym).reduce((s,r) => s + Number(r.amount||0), 0);
+  const dy = rows.filter(r => r.day === cur).reduce((s,r) => s + Number(r.amount||0), 0);
+  $('ms').textContent = '今天 ' + dy.toFixed(2) + ' 元　·　本月 ' + mo.toFixed(2) + ' 元';
+  $('mscard').hidden = false;
+}
+
+async function render(){
+  head(); renderDad(); loadRoutines(); loadBrief(); loadBack(); loadMoney();
+  $('next').disabled = cur >= today;
+
+  if (kind === 'money'){
+    const { data, error } = await cloud.database.from('spend')
+      .select('id,amount,note,created_at').eq('day', cur).order('created_at', { ascending: true });
+    const ul = $('list'); ul.innerHTML = '';
+    if (error) { $('c').textContent=''; setMsg('读取失败：' + errText(error), true); return; }
+    const rows = data || [];
+    $('c').textContent = rows.length ? rows.length + ' 笔' : '';
+    if (!rows.length){ ul.innerHTML = '<li><span class="empty">今天还没记账</span></li>'; return; }
+    rows.forEach(r => {
+      const li = document.createElement('li');
+      const t = document.createElement('span'); t.className='tm';
+      t.textContent = pad(new Date(r.created_at).getHours())+':'+pad(new Date(r.created_at).getMinutes());
+      const b = document.createElement('span'); b.className='bd'; b.textContent = r.note || '';
+      const a = document.createElement('span'); a.className='amt'; a.textContent = Number(r.amount).toFixed(2);
+      const x = document.createElement('button'); x.className='x'; x.textContent='×';
+      x.onclick = async () => {
+        const res = await cloud.database.from('spend').del().eq('id', r.id);
+        if (res.error) setMsg('删除失败：' + errText(res.error), true); else render();
+      };
+      li.append(t,b,a,x); ul.appendChild(li);
+    });
+    return;
+  }
+
+  if (kind === 'do'){
+    const [r1, r2] = await Promise.all([
+      cloud.database.from('dotasks').select('id,body,created_at').eq('active', true).order('created_at', { ascending: true }),
+      cloud.database.from('notes').select('body').eq('day', cur).eq('kind', 'do')
+    ]);
+    const ul = $('list'); ul.innerHTML = '';
+    if (r1.error || r2.error) { $('c').textContent=''; setMsg('读取失败：' + errText(r1.error || r2.error), true); return; }
+    const cnt = {};
+    (r2.data || []).forEach(n => { cnt[n.body] = (cnt[n.body] || 0) + 1; });
+    const dts = r1.data || [];
+    $('c').textContent = dts.length ? dts.length + ' 项' : '';
+    if (!dts.length){ ul.innerHTML = '<li><span class="empty">' + EMPTY[kind] + '</span></li>'; return; }
+    dts.forEach(r => {
+      const li = document.createElement('li');
+      const b = document.createElement('span'); b.className='bd'; b.textContent = r.body;
+      const n = document.createElement('span'); n.className='amt'; n.textContent = '今天 ' + (cnt[r.body]||0) + ' 次';
+      const add = document.createElement('button'); add.className='st s3'; add.textContent='记一次';
+      add.onclick = async () => {
+        const res = await cloud.database.from('notes').insert({ day: cur, kind: 'do', body: r.body }).select();
+        if (res.error) setMsg('没记上：' + errText(res.error), true);
+        else { cnt[r.body] = (cnt[r.body]||0)+1; n.textContent = '今天 ' + cnt[r.body] + ' 次'; }
+      };
+      const x = document.createElement('button'); x.className='x'; x.textContent='×'; x.title='这个先不做了';
+      x.onclick = async () => {
+        const res = await cloud.database.from('dotasks').update({ active: false }).eq('id', r.id).select();
+        if (res.error) setMsg('更新失败：' + errText(res.error), true); else render();
+      };
+      li.append(b,n,add,x); ul.appendChild(li);
+    });
+    return;
+  }
+
+  if (kind === 'backlog'){
+    const { data, error } = await cloud.database.from('notes')
+      .select('id,body,done,created_at').eq('kind', 'backlog').order('created_at', { ascending: true });
+    const ul = $('list'); ul.innerHTML = '';
+    if (error) { $('c').textContent=''; setMsg('读取失败：' + errText(error), true); return; }
+    const rows = data || [];
+    $('c').textContent = rows.length ? rows.length + ' 条' : '';
+    if (!rows.length){
+      if (!localStorage.getItem('v2-bk-seed')){
+        localStorage.setItem('v2-bk-seed','1');
+        const seeds = CONT.backlogSeeds;
+        let ok = true;
+        for (const s of seeds){
+          const r = await cloud.database.from('notes').insert({ day:'backlog', kind:'backlog', body:s, tag: SEED_TAG }).select();
+          if (r.error) ok = false;
+        }
+        if (ok) { render(); return; }
+      }
+      ul.innerHTML = '<li><span class="empty">' + EMPTY[kind] + '</span></li>'; return;
+    }
+    rows.forEach(r => {
+      const li = document.createElement('li');
+      if (r.done) li.className = 'done';
+      const ck = document.createElement('span'); ck.className = 'ck' + (r.done ? ' on' : '');
+      ck.onclick = async () => {
+        const res = await cloud.database.from('notes').update({ done: !r.done }).eq('id', r.id).select();
+        if (res.error) setMsg('更新失败：' + errText(res.error), true); else render();
+      };
+      li.appendChild(ck);
+      const b = document.createElement('span'); b.className='bd'; b.textContent = r.body;
+      const x = document.createElement('button'); x.className='x'; x.textContent='×'; x.title='删除';
+      x.onclick = async () => {
+        const res = await cloud.database.from('notes').del().eq('id', r.id).select();
+        if (res.error) setMsg('删除失败：' + errText(res.error), true); else render();
+      };
+      li.append(b,x); ul.appendChild(li);
+    });
+    return;
+  }
+
+  const { data, error } = await cloud.database.from('notes')
+    .select('id,kind,body,done,tag,created_at').eq('day', cur).eq('kind', kind)
+    .order('created_at', { ascending: true });
+  const ul = $('list'); ul.innerHTML = '';
+  if (error) { $('c').textContent=''; setMsg('读取失败：' + errText(error), true); return; }
+
+  const rows = data || [];
+  const done = rows.filter(r => r.done).length;
+  $('c').textContent = rows.length ? (kind === 'task' ? done + '/' + rows.length + ' 完成' : rows.length + ' 条') : '';
+  ring(done, rows.length);
+
+  /* 任务列表为空（如本机数据被清空）→ 显示内联离线快照，保证随时能看到任务 */
+  $('snapcard').hidden = !(kind === 'task' && rows.length === 0);
+
+  if (!rows.length){ ul.innerHTML = '<li><span class="empty">' + EMPTY[kind] + '</span></li>'; return; }
+
+  rows.forEach(r => {
+    const li = document.createElement('li');
+    if (r.done) li.className = 'done';
+    if (kind === 'task'){
+      const ck = document.createElement('span'); ck.className = 'ck' + (r.done ? ' on' : '');
+      ck.onclick = async () => {
+        const res = await cloud.database.from('notes').update({ done: !r.done }).eq('id', r.id).select();
+        if (res.error) setMsg('更新失败：' + errText(res.error), true); else render();
+      };
+      li.appendChild(ck);
+    } else if (kind === 'job'){
+      const i = STS.indexOf(r.tag || '待面');
+      const s = document.createElement('span');
+      s.className = 'st s' + Math.max(0, i);
+      s.textContent = r.tag || '待面';
+      s.onclick = async () => {
+        const nx = STS[(Math.max(0, i) + 1) % STS.length];
+        const res = await cloud.database.from('notes').update({ tag: nx }).eq('id', r.id).select();
+        if (res.error) setMsg('更新失败：' + errText(res.error), true); else render();
+      };
+      li.appendChild(s);
+    } else {
+      const t = document.createElement('span'); t.className='tm';
+      const dt = new Date(r.created_at);
+      t.textContent = pad(dt.getHours())+':'+pad(dt.getMinutes());
+      li.appendChild(t);
+    }
+    const b = document.createElement('span'); b.className='bd'; b.textContent = r.body;
+    const x = document.createElement('button'); x.className='x'; x.textContent='×'; x.title='删除';
+    x.onclick = async () => {
+      const res = await cloud.database.from('notes').del().eq('id', r.id).select();
+      if (res.error) setMsg('删除失败：' + errText(res.error), true); else render();
+    };
+    li.append(b,x); ul.appendChild(li);
+  });
+}
+
+async function save(){
+  const v = $('txt').value.trim();
+  if (kind === 'money'){
+    const amt = parseFloat($('amt').value);
+    if (isNaN(amt)) { setMsg('先填金额'); return; }
+    if (!v && isNaN(amt)) { setMsg('还没写内容'); return; }
+    setMsg('保存中…');
+    const r = await cloud.database.from('spend').insert({ day: cur, amount: amt, note: v });
+    if (r.error){ setMsg('没存上（' + errText(r.error) + '）', true); return; }
+    $('amt').value=''; $('txt').value=''; setMsg('记下了'); render();
+    setTimeout(()=>{ if($('m').textContent==='记下了') setMsg(''); }, 1800);
+    return;
+  }
+  if (kind === 'do'){
+    if (!v) { setMsg('还没写内容'); return; }
+    setMsg('保存中…');
+    const r = await cloud.database.from('dotasks').insert({ body: v }).select();
+    if (r.error){ setMsg('没存上：' + errText(r.error), true); return; }
+    $('txt').value=''; setMsg('加上了'); render();
+    setTimeout(()=>{ if($('m').textContent==='加上了') setMsg(''); }, 1800);
+    return;
+  }
+  if (!v) { setMsg('还没写内容'); return; }
+  setMsg('保存中…');
+  const dayVal = (kind === 'backlog') ? 'backlog' : cur;
+  const items = (kind === 'task' || kind === 'job' || kind === 'backlog')
+    ? v.split('\n').map(s => s.trim()).filter(Boolean).map(s => ({ day: dayVal, kind: kind, body: s, tag: null }))
+    : [{ day: dayVal, kind: kind, body: v }];
+  const { error } = await cloud.database.from('notes').insert(items).select();
+  if (error){ setMsg('没存上（' + errText(error) + '）', true); return; }
+  $('txt').value = ''; setMsg('记下了'); render();
+  setTimeout(()=>{ if($('m').textContent==='记下了') setMsg(''); }, 1800);
+}
+
+$('save').onclick = save;
+$('txt').addEventListener('keydown', e => { if ((e.ctrlKey||e.metaKey) && e.key === 'Enter') save(); });
+$('prev').onclick = () => { cur = shift(cur,-1); render(); };
+$('next').onclick = () => { if (cur < today) { cur = shift(cur,1); render(); } };
+
+/* 给爸消息 */
+function renderDad(){
+  const hasDad = !!(DADMSG && (DADMSG.morning || DADMSG.evening));
+  $('dadcard').hidden = !(kind === 'task' && hasDad);
+  if (!hasDad) return;
+  $('dadmorning').textContent = DADMSG.morning || '';
+  $('dadevening').textContent = DADMSG.evening || '';
+  const km = 'dad-sent-'+cur+'-m', ke = 'dad-sent-'+cur+'-e';
+  const sm = localStorage.getItem(km) === '1', se = localStorage.getItem(ke) === '1';
+  $('sentm').classList.toggle('on', sm);
+  $('sente').classList.toggle('on', se);
+  $('sentm').textContent = sm ? '早安已发✓' : '早安已发';
+  $('sente').textContent = se ? '晚安已发✓' : '晚安已发';
+}
+function fallbackCopy(text, done){
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); done(); } catch(e) {}
+  document.body.removeChild(ta);
+}
+function copyDad(text, btn){
+  if (!text) return;
+  const done = () => { const o = btn.textContent; btn.textContent = '已复制✓'; setTimeout(() => { btn.textContent = o; }, 1500); };
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+  } else fallbackCopy(text, done);
+}
+$('copym').onclick = () => copyDad(DADMSG.morning, $('copym'));
+$('copye').onclick = () => copyDad(DADMSG.evening, $('copye'));
+$('sentm').onclick = () => { const k = 'dad-sent-'+cur+'-m'; localStorage.getItem(k) === '1' ? localStorage.removeItem(k) : localStorage.setItem(k, '1'); renderDad(); };
+$('sente').onclick = () => { const k = 'dad-sent-'+cur+'-e'; localStorage.getItem(k) === '1' ? localStorage.removeItem(k) : localStorage.setItem(k, '1'); renderDad(); };
+</script>
+<!--WATER-START-->
+<div id="waterCard" style="display:none;position:fixed;left:16px;bottom:16px;z-index:60;
+  background:rgba(255,252,245,.96);border:1px solid rgba(128,110,80,.25);border-radius:12px;
+  padding:12px 14px;box-shadow:0 4px 18px rgba(90,75,50,.12);font-size:13px;
+  font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#3b3327;max-width:260px">
+  <div style="opacity:.62;margin-bottom:8px">💧 <b>喝水</b> <span style="font-size:11px">（点杯子记录 · 存本机）</span></div>
+  <div id="waterRow" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center"></div>
+  <div id="waterMsg" style="font-size:12px;opacity:.55;margin-top:7px"></div>
+</div>
+<script>
+(function(){
+  function boot(){
+    var card = document.getElementById("waterCard");
+    var row  = document.getElementById("waterRow");
+    var msg  = document.getElementById("waterMsg");
+    if(!card || !row) return;
+    var KEY = "v2-water-" + new Date().toISOString().slice(0,10);
+    function get(){ try{ return parseInt(localStorage.getItem(KEY)||"0",10)||0; }catch(e){ return 0; } }
+    function set(v){ try{ localStorage.setItem(KEY, String(v)); }catch(e){} }
+    function draw(){
+      var n = get(); row.innerHTML = "";
+      for(var i=0;i<8;i++){
+        var d = document.createElement("span");
+        d.textContent = i < n ? "🥤" : "○";
+        d.style.cssText = "font-size:19px;cursor:pointer;user-select:none;line-height:1";
+        d.title = "第 " + (i+1) + " 杯";
+        d.onclick = function(){
+          var cur = get();
+          set(cur === (i+1) ? i : (i+1));   // 点已亮的那杯 = 撤销
+          draw();
+        };
+        row.appendChild(d);
+      }
+      msg.textContent = n >= 8 ? "今天够了 👌" : ("已喝 " + n + " / 8 杯");
+    }
+    // 口令门一消失（= 已进入）就显示这块 —— 不等云端登录结果
+    function tick(){
+      var g = document.getElementById("gate");
+      var locked = g && !g.hidden && getComputedStyle(g).display !== "none";
+      card.style.display = locked ? "none" : "block";
+    }
+    draw(); tick(); setInterval(tick, 800);
+  }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+  else boot();
+})();
+</script>
+<!--WATER-END-->
+</body>
+</html>
