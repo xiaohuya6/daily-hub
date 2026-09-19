@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f4f0e9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#191612" media="(prefers-color-scheme: dark)">
+<title>求职驾驶舱</title>
+<style>
+/* ══════════════════════════════════════════════════════════════
+   求职驾驶舱 · job.html · 单文件（CSS/JS 全内联，仅引 hub-sync.js）
+   调色板沿用工作台「Amber Ops」，跟他 index.html 一致。
+   红线（一律不改）：
+     ① 单文件自包含；零外部依赖（不引 CDN / jQuery / 框架）；
+     ② 口令直接写死「我爱凌波」去解密（和 index.html 的 PASS 一致），
+        不做任何登录/口令框；
+     ③ 解密失败 / 网络失败 → 顶部状态条变红 + 用 localStorage 缓存上一次成功数据，
+        永远不白屏；
+     ④ 勾选 / 公司状态存 localStorage（job- 前缀），刷新后还在；不做云端写；
+     ⑤ 只用同源文件（job.enc.json），绝不 fetch 跨域 / api.github.com；
+     ⑥ 中文引号用「」不用 ASCII 双引号包中文。
+   ══════════════════════════════════════════════════════════════ */
+:root{
+  --page:#f4f0e9; --bg:#fffdfa;
+  --border:rgba(48,32,20,.10); --border-2:rgba(48,32,20,.16);
+  --ink-1:#1f1710; --ink-2:#4a3f34; --ink-3:#7a6a59;
+  --accent:#D9642A; --accent-deep:#B04E1E; --on-accent:#fffdfa;
+  --up:#2F7A55; --up-soft:rgba(47,122,85,.12); --on-up:#fdfefd;
+  --down:#B03A32; --down-soft:rgba(176,58,50,.12);
+  --chip-gray:#8a7d6c;
+  --r:18px; --r-sm:12px;
+  --shadow:0 1px 2px rgba(60,38,20,.06), 0 4px 12px -6px rgba(60,38,20,.10);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;overflow-x:clip}
+body{background:var(--page);color:var(--ink-1);
+  font:16px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  padding:14px 14px 44px calc(14px + env(safe-area-inset-left,0px));
+  -webkit-font-smoothing:antialiased}
+@media (min-width:720px){ body{max-width:720px;margin:0 auto} }
+
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:2px 0 10px}
+.tb-left{font-size:22px;font-weight:700;letter-spacing:-.01em}
+.tb-right{font-size:14px;color:var(--accent-deep);text-decoration:none;
+  border-bottom:1px dashed var(--border-2);white-space:nowrap}
+.status{font-size:13px;color:var(--ink-3);margin-bottom:14px;padding:7px 11px;
+  border-radius:10px;background:rgba(48,32,20,.05)}
+.status.ok{color:var(--up);background:var(--up-soft)}
+.status.fail{color:var(--down);background:var(--down-soft)}
+
+.screen{margin-bottom:22px}
+.sec-title{font-size:15px;font-weight:700;color:var(--ink-1);margin:0 0 12px;
+  display:flex;align-items:baseline;gap:8px}
+.sec-title .count{font-size:12px;font-weight:600;color:var(--ink-3)}
+
+#today-done-banner{background:var(--up-soft);color:var(--up);font-weight:700;
+  font-size:15px;text-align:center;padding:11px;border-radius:12px;margin-bottom:12px}
+#today-done-banner[hidden]{display:none}
+
+/* ── 今日三件 ─────────────────────────────────────────── */
+.tcard{background:var(--bg);border:1px solid var(--border);border-radius:var(--r);
+  padding:14px;margin-bottom:10px;box-shadow:var(--shadow);
+  display:flex;align-items:flex-start;gap:10px}
+.tnum{flex:0 0 auto;width:30px;text-align:center;font-size:24px;font-weight:800;
+  color:var(--accent);line-height:1.15}
+.tck{flex:0 0 auto;width:26px;height:26px;margin-top:3px;border:1.6px solid var(--border-2);
+  border-radius:50%;background:var(--bg);cursor:pointer;position:relative;transition:.16s}
+.tck::before{content:"";position:absolute;inset:-9px}
+.tck.on{background:var(--up);border-color:var(--up)}
+.tck.on::after{content:"";position:absolute;left:8px;top:4px;width:6px;height:11px;
+  border:solid var(--on-up);border-width:0 2px 2px 0;transform:rotate(45deg)}
+.tcard.done .tck.on::after{content:""}
+.tbody{flex:1;min-width:0}
+.ttext{font-size:17px;line-height:1.5;color:var(--ink-1);word-break:break-word}
+.tok{font-size:12px;color:var(--ink-3);margin-top:4px}
+.tcard.done .ttext{color:var(--ink-3);text-decoration:line-through;text-decoration-thickness:1px}
+.tcopy{flex:0 0 auto;align-self:center;min-height:44px;padding:0 16px;border:none;
+  border-radius:12px;background:var(--accent-deep);color:var(--on-accent);
+  font-weight:700;font-size:15px;cursor:pointer;transition:.15s}
+.tcopy.copied{background:var(--up)}
+
+/* ── 公司卡 ──────────────────────────────────────────── */
+.ccard{background:var(--bg);border:1px solid var(--border);border-radius:var(--r);
+  padding:15px;margin-bottom:11px;box-shadow:var(--shadow);cursor:pointer}
+.crow1{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.cname{font-size:19px;font-weight:700;color:var(--ink-1);min-width:0;overflow-wrap:anywhere}
+.cbadge{flex:0 0 auto;width:28px;height:28px;border-radius:8px;display:inline-flex;
+  align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:15px}
+.cbadge.a{background:var(--up)}
+.cbadge.b{background:var(--accent)}
+.cfull{font-size:13px;color:var(--ink-3);margin-top:3px;overflow-wrap:anywhere}
+.crow3{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.chip{font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;
+  background:rgba(48,32,20,.06);color:var(--chip-gray);white-space:nowrap}
+.chip.year{color:var(--ink-2)}
+.chip.year.unknown{color:var(--chip-gray)}
+.chip.xhs.clean{background:var(--up-soft);color:var(--up)}
+.chip.xhs.bad{background:var(--down-soft);color:var(--down)}
+.chip.xhs.unknown{background:rgba(48,32,20,.06);color:var(--chip-gray)}
+.chip.status{background:rgba(48,32,20,.06);color:var(--ink-2);cursor:pointer}
+.cwhy{font-size:14px;line-height:1.55;color:var(--ink-2);margin-top:10px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ccard.expanded .cwhy{-webkit-line-clamp:unset;overflow:visible}
+.crow5{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.cbtn{min-height:44px;padding:0 16px;border-radius:12px;font-size:14px;font-weight:700;
+  cursor:pointer;border:1px solid var(--border-2);background:var(--bg);color:var(--ink-2);
+  transition:.15s}
+.cbtn.copy{background:var(--accent-deep);color:var(--on-accent);border-color:transparent}
+.cbtn.copy.copied{background:var(--up)}
+.cbtn.mark{color:var(--accent-deep);border-color:var(--accent)}
+.crow6{margin-top:10px}
+
+/* ── 规矩 ────────────────────────────────────────────── */
+.rules{background:rgba(48,32,20,.05);border-radius:12px;padding:12px 14px}
+.rule-item{font-size:13px;color:var(--ink-2);line-height:1.7;padding:3px 0;
+  border-top:1px solid var(--border)}
+.rule-item:first-child{border-top:none}
+.updated{font-size:12px;color:var(--ink-3);margin-top:8px;text-align:center}
+
+@media (max-width:480px){
+  body{padding:12px 12px 40px}
+  .tcard,.ccard{padding:13px}
+  .ttext{font-size:16px}
+  .tnum{font-size:22px;width:27px}
+  .cname{font-size:18px}
+}
+@media (prefers-reduced-motion: reduce){
+  *{transition-duration:.001ms!important}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="tb-left">求职驾驶舱</div>
+  <a class="tb-right" href="index.html">← 工作台</a>
+</div>
+<div class="status" id="status">☁ 读取中…</div>
+
+<main>
+  <section class="screen">
+    <div id="today-done-banner" hidden>今天的都做完了 ✓</div>
+    <div id="today-list"></div>
+  </section>
+
+  <section class="screen">
+    <h2 class="sec-title">A 类 · 可以聊<span class="count" id="a-count"></span></h2>
+    <div id="a-list"></div>
+  </section>
+
+  <section class="screen">
+    <h2 class="sec-title">B 类 · 可以聊<span class="count" id="b-count"></span></h2>
+    <div id="b-list"></div>
+  </section>
+
+  <section class="screen">
+    <div class="rules" id="rules"></div>
+    <div class="updated" id="updated"></div>
+  </section>
+</main>
+
+<!-- 云端同步层（同源加密备份）· 复用 index 那套 PBKDF2+AES-GCM，不各写一份 -->
+<script src="hub-sync.js?v=2026-09-19-3"></script>
+
+<script>
+/* ══ 求职驾驶舱 · 解密 + 渲染 ══
+   红线：口令写死「我爱凌波」；只用同源 job.enc.json；失败不白屏（localStorage 缓存）。
+   状态本地存：job- 前缀（job-data 缓存 / job-done 今日勾选 / job-status 公司状态）。 */
+const PASS = '我爱凌波';
+const LS_DATA   = 'job-data';
+const LS_DONE   = 'job-done';
+const LS_STATUS = 'job-status';
+
+const NUMS = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩'];
+const STATES = ['待回','已回','已投','已约面'];
+
+const $ = id => document.getElementById(id);
+function el(tag, cls, txt){ const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+
+/* 本地读写（容错） */
+function gj(k, d){ try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch(e){ return d; } }
+function sj(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
+function loadCache(){ try { const v = localStorage.getItem(LS_DATA); return v ? JSON.parse(v) : null; } catch(e){ return null; } }
+
+/* ── 复制回复稿（剪贴板 + 兜底）────────────────────────── */
+function fallbackCopy(text, done){
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; ta.style.top = '-1000px';
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  try { document.execCommand('copy'); done(); } catch(e){}
+  document.body.removeChild(ta);
+}
+function copyText(text, btn){
+  if (!text) return;
+  const done = () => { const o = btn.textContent; btn.textContent = '已复制 ✓'; btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = o; btn.classList.remove('copied'); }, 2000); };
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+  } else fallbackCopy(text, done);
+}
+
+function setStatus(text, kind){
+  const s = $('status'); if (!s) return;
+  s.textContent = text; s.className = 'status' + (kind ? ' ' + kind : '');
+}
+
+/* ── 渲染 ─────────────────────────────────────────────── */
+let REPLY = {};   // company -> 回复稿（来自今日 reply/ask）
+
+function fmtUpdated(u){ if (!u) return ''; return u.replace('T', ' ').replace(/\+08:00$/, ''); }
+
+function render(data){
+  if (!data) return;
+  REPLY = {};
+  (data.today || []).forEach(t => { if (t.reply && t.company) REPLY[t.company] = t.reply; });
+
+  renderToday(data.today || []);
+  renderCompanies(data, 'A');
+  renderCompanies(data, 'B');
+  $('a-count').textContent = '(' + (cnt(data, 'A')) + ' 家)';
+  $('b-count').textContent = '(' + (cnt(data, 'B')) + ' 家)';
+
+  const rb = $('rules'); rb.innerHTML = '';
+  (data.rules || []).forEach(r => rb.appendChild(el('div', 'rule-item', r)));
+  $('updated').textContent = '数据更新于 ' + fmtUpdated(data.updated);
+}
+
+function cnt(data, cls){
+  if (data.counts && data.counts[cls] != null) return data.counts[cls];
+  return (data.jobs || []).filter(j => j.class === cls).length;
+}
+
+function renderToday(today){
+  const list = $('today-list'); list.innerHTML = '';
+  const done = gj(LS_DONE, {});
+  today.forEach((t, i) => {
+    const card = el('div', 'tcard'); card.dataset.id = t.id;
+    if (done[t.id]) card.classList.add('done');
+    card.appendChild(el('div', 'tnum', NUMS[i] || String(i + 1)));
+    const ck = el('div', 'tck' + (done[t.id] ? ' on' : '')); ck.dataset.id = t.id;
+    ck.onclick = () => toggleDone(t.id, ck, card);
+    card.appendChild(ck);
+    const body = el('div', 'tbody');
+    body.appendChild(el('div', 'ttext', t.text || ''));
+    if (t.ok) body.appendChild(el('div', 'tok', '✓ ' + t.ok));
+    card.appendChild(body);
+    const hasReply = (t.kind === 'reply' || t.kind === 'ask') && (t.reply && t.reply.trim());
+    if (hasReply){
+      const btn = el('button', 'tcopy', '复制回复稿');
+      btn.onclick = () => copyText(t.reply, btn);
+      card.appendChild(btn);
+    }
+    list.appendChild(card);
+  });
+  updateBanner();
+}
+
+function toggleDone(id, ck, card){
+  const m = gj(LS_DONE, {});
+  if (m[id]) { delete m[id]; ck.classList.remove('on'); card.classList.remove('done'); }
+  else { m[id] = '1'; ck.classList.add('on'); card.classList.add('done'); }
+  sj(LS_DONE, m); updateBanner();
+}
+
+function updateBanner(){
+  const list = $('today-list'); if (!list) return;
+  const m = gj(LS_DONE, {});
+  const items = list.children.length;
+  let done = 0;
+  for (const c of list.children) if (m[c.dataset.id]) done++;
+  $('today-done-banner').hidden = !(items > 0 && done >= items);
+}
+
+function renderCompanies(data, cls){
+  const list = $(cls === 'A' ? 'a-list' : 'b-list'); list.innerHTML = '';
+  const st = gj(LS_STATUS, {});
+  (data.jobs || []).filter(j => j.class === cls).forEach(j => {
+    const card = el('div', 'ccard'); card.dataset.id = j.id;
+    const r1 = el('div', 'crow1');
+    r1.appendChild(el('span', 'cname', j.short || j.company || j.id));
+    r1.appendChild(el('span', 'cbadge ' + (cls === 'A' ? 'a' : 'b'), cls));
+    card.appendChild(r1);
+    card.appendChild(el('div', 'cfull', j.company || ''));
+
+    const r3 = el('div', 'crow3');
+    const yr = (j.year || '').toString().trim();
+    r3.appendChild(el('span', 'chip year' + (yr ? '' : ' unknown'), yr ? (yr + ' 年') : '年份未核'));
+    const xhs = j.xhs || 'unknown';
+    let xcls = 'unknown', xtxt = '还没查';
+    if (xhs === '干净') { xcls = 'clean'; xtxt = '干净'; }
+    else if (xhs === '有黑料') { xcls = 'bad'; xtxt = '有黑料'; }
+    r3.appendChild(el('span', 'chip xhs ' + xcls, xtxt));
+    card.appendChild(r3);
+
+    card.appendChild(el('div', 'cwhy', j.why || ''));
+
+    const r5 = el('div', 'crow5');
+    const replyText = REPLY[j.id] || REPLY[j.company] || '';
+    if (replyText){
+      const cb = el('button', 'cbtn copy', '复制回复稿');
+      cb.onclick = e => { e.stopPropagation(); copyText(replyText, cb); };
+      r5.appendChild(cb);
+    }
+    const mb = el('button', 'cbtn mark', '标记已回');
+    mb.onclick = e => { e.stopPropagation(); markReplied(card, j.id); };
+    r5.appendChild(mb);
+    card.appendChild(r5);
+
+    const r6 = el('div', 'crow6'); r6.hidden = true;
+    const chip = el('span', 'chip status', st[j.id] || '待回');
+    chip.dataset.state = st[j.id] || '待回';
+    chip.onclick = e => { e.stopPropagation(); cycleStatus(j.id, chip); };
+    r6.appendChild(chip);
+    card.appendChild(r6);
+
+    card.onclick = () => card.classList.toggle('expanded');
+    list.appendChild(card);
+  });
+}
+
+function markReplied(card, id){
+  const r6 = card.querySelector('.crow6'); if (r6) r6.hidden = false;
+  const m = gj(LS_STATUS, {});
+  if (!m[id]){ m[id] = '已回'; sj(LS_STATUS, m);
+    const chip = card.querySelector('.status'); if (chip){ chip.textContent = '已回'; chip.dataset.state = '已回'; } }
+}
+
+function cycleStatus(id, chip){
+  const cur = chip.dataset.state || '待回';
+  let i = STATES.indexOf(cur); if (i < 0) i = 0;
+  const nx = STATES[(i + 1) % STATES.length];
+  chip.textContent = nx; chip.dataset.state = nx;
+  const m = gj(LS_STATUS, {}); m[id] = nx; sj(LS_STATUS, m);
+}
+
+/* ── 启动：先画缓存（不白屏）→ 再拉云端加密备份 ────────── */
+function boot(){
+  const cache = loadCache();
+  if (cache){ render(cache); setStatus('☁ 已同步（本地缓存）', 'ok'); }
+  if (window.HUBSYNC && window.HUBSYNC.readEncrypted){
+    window.HUBSYNC.readEncrypted('job.enc.json', PASS)
+      .then(function (d){
+        try { localStorage.setItem(LS_DATA, JSON.stringify(d)); } catch(e){}
+        render(d); setStatus('☁ 已同步', 'ok');
+      })
+      .catch(function (e){
+        const msg = cache ? '☁ 读取失败（显示上一次的）'
+                          : ('☁ 读取失败：' + ((e && e.message) || e));
+        setStatus(msg, 'fail');
+      });
+  } else {
+    setStatus(cache ? '☁ 同步组件未加载（显示上一次的）' : '☁ 同步组件未加载', 'fail');
+  }
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+else boot();
+</script>
+</body>
+</html>
