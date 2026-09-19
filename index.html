@@ -680,12 +680,13 @@ $('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('unlock').cl
 
 function enter(){
   $('gate').hidden = true; $('app').hidden = false;
-  /* 云端同步：把「重画」暴露给同步层（拉回云端数据后要重画一次），再去连云端。
-     没配对 token 时直接本地渲染 —— 页面照常能用，只是数据只在本机。 */
+  /* 重画入口：云端数据合并进来后要重画一次 */
   window.__HUB_RENDER = function(){ try { seedIfNeeded(); } catch(e){} render(); };
   syncTab(); renderSnap();
-  if (window.HUBSYNC && window.HUBSYNC.hasToken()) { window.HUBSYNC.boot(); }
-  else { window.__HUB_RENDER(); }
+  /* 先按本机数据画一遍（保证打开就有东西），再让数据层去核云端加密备份。
+     刷新页面时口令框是空的 → 退回默认口令（口令本来就写在页面里，不额外泄露）。 */
+  window.__HUB_RENDER();
+  if (window.HUBSYNC) { window.HUBSYNC.unlock($('pw').value || PASS); }
 }
 if (localStorage.getItem(KEY) === '1') enter();
 
