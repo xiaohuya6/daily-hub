@@ -194,7 +194,19 @@
     markBackedUp: markBackedUp,
     snapshot: localSnapshot,
     isDirty: function () { try { return !!localStorage.getItem(DIRTY_KEY); } catch (e) { return false; } },
-    version: '2026-09-19-2'
+    /* 读任意**同源加密文件** —— 给 job.html 等新页面复用同一套 PBKDF2+AES-GCM，
+       不用各写一份（写两份 = 以后改算法会漏改一处）。 */
+    readEncrypted: function (url, pass) {
+      return deriveKey(pass).then(function (key) {
+        return fetch(url + '?v=' + Date.now(), { cache: 'no-store' })
+          .then(function (r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+          })
+          .then(function (blob) { return decryptBlob(key, blob); });
+      });
+    },
+    version: '2026-09-19-3'
   };
 
   /* 页面加载先按本地渲染（不等网络），保证任何情况下都是「打开就有数据」 */
