@@ -170,7 +170,9 @@ textarea::placeholder{color:var(--ink-3)}
 .err{color:var(--down)}
 .hint{font-size:12px;color:var(--ink-3);margin-top:13px;line-height:1.75}
 
-/* ── 翻页条 ───────────────────────────────────────────── */
+.statusbar{font-size:12px;color:var(--ink-3);background:var(--panel-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:7px 11px;margin-bottom:12px;line-height:1.5;font-variant-numeric:tabular-nums;white-space:normal}
+.iobar{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;position:relative;z-index:70}
+.iobar .nav{font-size:13px;padding:0 16px;min-height:38px}
 .bar2{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:11px}
 .nav{background:var(--bg);border:1px solid var(--border);padding:0 14px;min-height:40px;
   font-size:13px;border-radius:var(--r-sm);color:var(--ink-2);cursor:pointer;transition:background .15s,color .15s,border-color .15s}
@@ -297,6 +299,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 </div>
 
 <div id="app" hidden>
+  <div id="storeStatus" class="statusbar"></div>
   <div class="hd">
     <div>
       <div class="d1"><span id="d1"></span><span class="v2tag">v2</span></div>
@@ -397,7 +400,12 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
   <div class="hint">
     手机和电脑打开同一个链接，内容是同一份（都存在本机）。<br>
-    这是 <b>v2</b> 工作台（本地版，无需登录），想回 v1 点 <a class="v1link" href="index.html.v1-backup-20260918-2200">这里</a>。
+    这是 <b>v2</b> 工作台（本地版，无需登录），    想回 v1 点 <a class="v1link" href="index.html.v1-backup-20260918-2200">这里</a>。
+  </div>
+  <div class="iobar">
+    <button class="nav" id="btnExport">导出全部数据(JSON)</button>
+    <button class="nav" id="btnImport">导入数据(JSON)</button>
+    <input id="fileInput" type="file" accept="application/json,.json" hidden>
   </div>
 </div>
 
@@ -408,7 +416,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 <!-- 云端同步层（数据存本机为主 + 同源加密备份，跟链接 / WorkBuddy 账号无关）· 2026-09-19 加
      🔴 改了 hub-sync.js 必须同步换这里的 v= 号，否则浏览器用缓存、新版不生效（踩过） -->
-<script src="hub-sync.js?v=2026-09-19-4"></script>
+<script src="hub-sync.js?v=2026-09-20-1"></script>
 
 <script>
 /* ══ 约束红线 ══
@@ -445,9 +453,10 @@ const LS = {
 
 function loadArr(k){ try { return JSON.parse(localStorage.getItem(k) || '[]'); } catch(e){ return []; } }
 function saveArr(k, a){
-  try { localStorage.setItem(k, JSON.stringify(a)); } catch(e){}
-  /* 本地写完立刻同步到云端（GitHub 私有仓库）—— 这样换链接/换设备数据都不丢 */
+  safeSet(k, JSON.stringify(a));
+  /* 本地写完立刻标记待同步（加密备份由你手动上传到同源 data.enc.json） */
   try { if (window.HUBSYNC) window.HUBSYNC.touch(); } catch(e){}
+  try { if (window.__HUB_STATUS_REFRESH) window.__HUB_STATUS_REFRESH(); } catch(e){}
 }
 let _seq = 0;
 function newId(){ return 'v2-' + Date.now().toString(36) + '-' + (_seq++).toString(36); }
@@ -569,16 +578,192 @@ function errText(e){
   return [e.message, e.hint, e.details, e.code, e.name].filter(Boolean).join(' · ') || JSON.stringify(e);
 }
 
-/* ── 内容版本机制（内容改了要能自动生效）───────────────────────────
-   content.js 顶部有 version 字段；本地记住「上次生效的内容签名」。
-   签名 = version + 文案指纹 —— 所以就算忘了换 version，只要文案改了也会自动生效。
-   签名不一致（含首次进入）→ 自动把新的 snapshotTasks / backlogSeeds 合并进来。
-   合并铁律（保守，绝不丢用户的数据）：
-     ① 已经勾完的（done=true）  → 不删、不改；
-     ② 你自己写的（非预置条目） → 不删、不改；
-     ③ 只有「还没勾的预置条目」 → 允许被新版替换成新内容。
-   dad / routines 不是列表，直接以 content.js 为准（覆盖）。
-   ──────────────────────────────────────────────────────────────── */
+/* ══ 2026-09-20 防丢数据加固 ══ */
+var __warnBar = null, __lastFail = 0, __lastWrite = null, __recovered = 0;
+function showStorageWarn(msg){
+  if (!__warnBar){
+    __warnBar = document.createElement('div'); __warnBar.id = 'storeWarn';
+    __warnBar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:10001;'
+      + 'background:#c0392b;color:#fff;font-size:13px;line-height:1.5;padding:9px 12px;'
+      + 'text-align:center;font-family:system-ui,-apple-system,"PingFang SC",sans-serif;'
+      + 'box-shadow:0 2px 10px rgba(0,0,0,.3)';
+    (document.body || document.documentElement).appendChild(__warnBar);
+  }
+  __warnBar.textContent = '⚠️ ' + msg; __warnBar.hidden = false;
+}
+
+function emergencyDump(){
+  var o = { schema: 1, savedAt: new Date().toISOString(), reason: 'EMERGENCY' };
+  for (var i = 0; i < localStorage.length; i++){
+    var k = localStorage.key(i);
+    if (k && k.indexOf('v2-') === 0){ try { o[k] = localStorage.getItem(k); } catch(e){} }
+  }
+  try { o.__content = window.CONTENT || null; } catch(e){}
+  var blob = new Blob([JSON.stringify(o, null, 1)], { type: 'application/json' });
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'daily-hub-EMERGENCY-' + new Date().toISOString().replace(/[:.]/g,'-') + '.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+window.__HUB_EMERGENCY_DUMP = emergencyDump;
+
+function downloadAllData(reason){
+  try {
+    var o = { schema: 1, savedAt: new Date().toISOString(), reason: reason || 'export' };
+    for (var i = 0; i < localStorage.length; i++){
+      var k = localStorage.key(i);
+      if (k && k.indexOf('v2-') === 0){ try { o[k] = localStorage.getItem(k); } catch(e){} }
+    }
+    try { o.__content = window.CONTENT || null; } catch(e){}
+    var blob = new Blob([JSON.stringify(o, null, 1)], { type: 'application/json' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = 'daily-hub-' + (reason === 'export' ? '导出-' : '备份-') + new Date().toISOString().replace(/[:.]/g,'-') + '.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  } catch(e){}
+}
+
+/* ── IndexedDB 第二份存储（本机双保险，写失败不报警）── */
+var __IDB = null;
+function idbOpen(cb){
+  if (__IDB){ cb(__IDB); return; }
+  try {
+    var r = indexedDB.open('hubdb', 1);
+    r.onupgradeneeded = function(){ try { r.result.createObjectStore('kv'); } catch(e){} };
+    r.onsuccess = function(){ __IDB = r.result; cb(__IDB); };
+    r.onerror = function(){ cb(null); };
+  } catch(e){ cb(null); }
+}
+function idbSet(k, v){
+  idbOpen(function(db){ if (!db) return; try { db.transaction('kv','readwrite').objectStore('kv').put(v, k); } catch(e){} });
+}
+function idbGet(k, cb){
+  idbOpen(function(db){
+    if (!db){ cb(null); return; }
+    try {
+      var tx = db.transaction('kv','readonly');
+      var rq = tx.objectStore('kv').get(k);
+      rq.onsuccess = function(){ cb(rq.result != null ? rq.result : null); };
+      rq.onerror = function(){ cb(null); };
+    } catch(e){ cb(null); }
+  });
+}
+function idbDelete(k){
+  idbOpen(function(db){ if (!db) return; try { db.transaction('kv','readwrite').objectStore('kv').delete(k); } catch(e){} });
+}
+
+function safeSet(k, v){
+  try {
+    localStorage.setItem(k, v);
+    __lastWrite = new Date();
+    idbSet(k, v);            // 第二份存储（IndexedDB），写失败不报警
+    refreshStatus();
+    return true;
+  }
+  catch(e){
+    var now = Date.now();
+    var msg = '⚠️ 数据没存进本机！已在下载备份文件，请立刻把它发给我';
+    if (now - __lastFail > 1500){ __lastFail = now; showStorageWarn(msg); try { emergencyDump(); } catch(_){} }
+    else showStorageWarn(msg);
+    return false;
+  }
+}
+function safeRemove(k){
+  try {
+    localStorage.removeItem(k);
+    __lastWrite = new Date();
+    idbDelete(k);
+    refreshStatus();
+    return true;
+  }
+  catch(e){ showStorageWarn('⚠️ 数据删除失败：' + ((e&&e.message)||e)); return false; }
+}
+
+function fmtTime(d){ var t = new Date(d); return pad(t.getHours())+':'+pad(t.getMinutes())+':'+pad(t.getSeconds()); }
+function countArr(v){ try { return (JSON.parse(v || '[]') || []).length; } catch(e){ return 0; } }
+function refreshStatus(){
+  var el = document.getElementById('storeStatus'); if (!el) return;
+  var KEYS = ['v2-notes','v2-spend','v2-dotasks','v2-routines'];
+  var N = 0, readFail = false;
+  KEYS.forEach(function(k){
+    try { N += countArr(localStorage.getItem(k) || '[]'); }
+    catch(e){ readFail = true; }
+  });
+  var M = 0, done = 0;
+  KEYS.forEach(function(k){
+    idbGet(k, function(val){ if (val != null) M += countArr(val); done++; if (done === KEYS.length) paint(); });
+  });
+  function paint(){
+    var last = __lastWrite ? fmtTime(__lastWrite) : '—';
+    var state, bg, fg;
+    if (readFail){ state = '读取失败'; bg = 'var(--down-soft)'; fg = 'var(--down)'; }
+    else if (__recovered > 0){ state = '已恢复 ' + __recovered + ' 条'; bg = '#c0392b'; fg = '#fff'; }
+    else if (M < N){ state = '备份落后'; bg = 'var(--down-soft)'; fg = 'var(--down)'; }
+    else { state = 'OK'; bg = 'var(--up-soft)'; fg = 'var(--up)'; }
+    el.textContent = '本机 ' + N + ' 条 · 本机备份 ' + M + ' 条 · 上次写入 ' + last + ' · 状态: ' + state;
+    el.style.background = bg; el.style.color = fg;
+  }
+}
+
+function exportAll(){ downloadAllData('export'); setMsg('已导出全部数据（本机 v2- 键）到下载文件'); }
+function importAll(file){
+  if (!confirm('导入会用文件里的数据覆盖本机，确定吗？\n（导入前会自动先备份当前本机数据到下载文件）')) return;
+  downloadAllData('pre-import-backup');
+  var reader = new FileReader();
+  reader.onload = function(){
+    try {
+      var obj = JSON.parse(reader.result);
+      if (obj && typeof obj === 'object'){
+        Object.keys(obj).forEach(function(k){
+          if (k.indexOf('v2-') === 0){ safeSet(k, obj[k]); }
+        });
+        if (window.__HUB_RENDER) { try { window.__HUB_RENDER(); } catch(e){} }
+        try { if (window.HUBSYNC && window.HUBSYNC.touch) window.HUBSYNC.touch(); } catch(e){}
+        refreshStatus();
+        setMsg('导入完成，已重画页面（导入前已自动备份当前数据）');
+      } else { setMsg('导入失败：文件格式不对', true); }
+    } catch(e){ setMsg('导入失败：' + ((e&&e.message)||e), true); }
+  };
+  reader.readAsText(file);
+}
+
+function flushOnExit(){
+  try { if (window.HUBSYNC && window.HUBSYNC.touch) window.HUBSYNC.touch(); } catch(e){}
+}
+document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'hidden') flushOnExit(); });
+window.addEventListener('pagehide', flushOnExit);
+window.addEventListener('beforeunload', flushOnExit);
+
+window.__safeSet = safeSet;
+window.__safeRemove = safeRemove;
+window.__hubStoreFail = function(msg){
+  var now = Date.now();
+  var t = '⚠️ 数据没存进本机！已在下载备份文件，请立刻把它发给我';
+  if (now - __lastFail > 1500){ __lastFail = now; showStorageWarn(t); try { emergencyDump(); } catch(_){} }
+  else showStorageWarn(t);
+};
+window.__HUB_STATUS_REFRESH = refreshStatus;
+$('btnExport').onclick = exportAll;
+$('btnImport').onclick = function(){ $('fileInput').click(); };
+$('fileInput').onchange = function(e){ if (e.target.files && e.target.files[0]) importAll(e.target.files[0]); e.target.value = ''; };
+
+/* ── 加载时从 IndexedDB 恢复（只补不覆盖：本机有数据绝不用旧备份盖）── */
+function hubRecover(){
+  var KEYS = ['v2-notes','v2-spend','v2-dotasks','v2-routines'];
+  var pending = 0;
+  function finish(){ if (pending > 0) return; if (window.__HUB_RENDER) { try { window.__HUB_RENDER(); } catch(e){} } refreshStatus(); }
+  KEYS.forEach(function(k){
+    var lsVal; try { lsVal = localStorage.getItem(k); } catch(e){ lsVal = null; }
+    var ok = false;
+    if (lsVal != null && lsVal !== ''){ try { ok = (JSON.parse(lsVal)||[]).length > 0; } catch(e){ ok = true; } }
+    if (ok) return;
+    pending++;
+    idbGet(k, function(val){
+      if (val != null){ try { var _a = JSON.parse(val)||[]; localStorage.setItem(k, val); __recovered += (Array.isArray(_a)?_a.length:0); idbSet(k, val); } catch(e){} }
+      pending--; finish();
+    });
+  });
+  finish();
+}
+
 const VER_KEY    = 'v2-content-version';  // 本地记住的内容签名
 const SEED_TAG   = 'seed';                // 预置条目标记（写在 notes 的 tag 字段上）
 const SEED_TEXTS = 'v2-seed-texts';       // 历史种入过的预置文案（兜底识别旧版种下的预置）
@@ -595,7 +780,7 @@ function loadSeedTexts(){
   try { const a = JSON.parse(localStorage.getItem(SEED_TEXTS) || '[]'); return Array.isArray(a) ? a : []; }
   catch(e){ return []; }
 }
-function saveSeedTexts(a){ try { localStorage.setItem(SEED_TEXTS, JSON.stringify((a||[]).slice(-800))); } catch(e){} }
+function saveSeedTexts(a){ safeSet(SEED_TEXTS, JSON.stringify((a||[]).slice(-800))); }
 
 /* 保守合并：把 newTexts 作为「预置条目」合并进某一类列表 */
 function mergePresets(notes, kindName, dayVal, newTexts, history){
@@ -669,13 +854,13 @@ function seedIfNeeded(){
   }
 
   /* ③ 记住本次生效的内容签名 */
-  try { localStorage.setItem(VER_KEY, sig); } catch(e){}
+  safeSet(VER_KEY, sig);
 }
 
 /* 口令门 → 直接进主界面（无云端登录、无登录态校验、无任何登录提示） */
 $('unlock').onclick = () => {
   if ($('pw').value !== PASS) { $('gmsg').textContent = '口令不对'; $('pw').value=''; return; }
-  localStorage.setItem(KEY,'1');
+  safeSet(KEY,'1');
   enter();
 };
 $('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('unlock').click(); });
@@ -685,10 +870,12 @@ function enter(){
   /* 重画入口：云端数据合并进来后要重画一次 */
   window.__HUB_RENDER = function(){ try { seedIfNeeded(); } catch(e){} render(); };
   syncTab(); renderSnap();
+  hubRecover();   // 先从 IndexedDB 兜底恢复（异步，完成后会再渲染一次）
   /* 先按本机数据画一遍（保证打开就有东西），再让数据层去核云端加密备份。
      刷新页面时口令框是空的 → 退回默认口令（口令本来就写在页面里，不额外泄露）。 */
   window.__HUB_RENDER();
   if (window.HUBSYNC) { window.HUBSYNC.unlock($('pw').value || PASS); }
+  try { if (window.__HUB_STATUS_REFRESH) window.__HUB_STATUS_REFRESH(); } catch(e){}
 }
 if (localStorage.getItem(KEY) === '1') enter();
 
@@ -876,7 +1063,7 @@ async function render(){
     $('c').textContent = rows.length ? rows.length + ' 条' : '';
     if (!rows.length){
       if (!localStorage.getItem('v2-bk-seed')){
-        localStorage.setItem('v2-bk-seed','1');
+        safeSet('v2-bk-seed','1');
         const seeds = CONT.backlogSeeds;
         let ok = true;
         for (const s of seeds){
@@ -1029,8 +1216,8 @@ function copyDad(text, btn){
 }
 $('copym').onclick = () => copyDad(DADMSG.morning, $('copym'));
 $('copye').onclick = () => copyDad(DADMSG.evening, $('copye'));
-$('sentm').onclick = () => { const k = 'dad-sent-'+cur+'-m'; localStorage.getItem(k) === '1' ? localStorage.removeItem(k) : localStorage.setItem(k, '1'); renderDad(); };
-$('sente').onclick = () => { const k = 'dad-sent-'+cur+'-e'; localStorage.getItem(k) === '1' ? localStorage.removeItem(k) : localStorage.setItem(k, '1'); renderDad(); };
+$('sentm').onclick = () => { const k = 'dad-sent-'+cur+'-m'; localStorage.getItem(k) === '1' ? safeRemove(k) : safeSet(k, '1'); renderDad(); };
+$('sente').onclick = () => { const k = 'dad-sent-'+cur+'-e'; localStorage.getItem(k) === '1' ? safeRemove(k) : safeSet(k, '1'); renderDad(); };
 </script>
 <!--WATER-START-->
 <div id="waterCard" style="display:none;position:fixed;left:16px;bottom:16px;z-index:60;
@@ -1050,7 +1237,7 @@ $('sente').onclick = () => { const k = 'dad-sent-'+cur+'-e'; localStorage.getIte
     if(!card || !row) return;
     var KEY = "v2-water-" + new Date().toISOString().slice(0,10);
     function get(){ try{ return parseInt(localStorage.getItem(KEY)||"0",10)||0; }catch(e){ return 0; } }
-    function set(v){ try{ localStorage.setItem(KEY, String(v)); }catch(e){} }
+    function set(v){ try{ if(window.__safeSet) window.__safeSet(KEY, String(v)); else localStorage.setItem(KEY, String(v)); }catch(e){} }
     function draw(){
       var n = get(); row.innerHTML = "";
       for(var i=0;i<8;i++){
