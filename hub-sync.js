@@ -40,6 +40,27 @@
   var KEYS = ['notes', 'spend', 'dotasks', 'routines'];
   var DIRTY_KEY = 'hub-pending-backup';   // 本地有改动、还没进云端备份
 
+  /* ── 防丢：存储失败可视化 + 状态自检 ── */
+  var lastCloud = null, lastSync = null, lastState = '—', lastPull = 0;
+  function rowsOf(o){ var n=0; if(o) KEYS.forEach(function(k){ if(Array.isArray(o[k])) n+=o[k].length; }); return n; }
+  function setStatus(state, syncNow){ if(state) lastState = state; if(syncNow) lastSync = new Date(); if(window.__HUB_STATUS_REFRESH){ try{ window.__HUB_STATUS_REFRESH(); }catch(e){} } }
+  function failSet(k, v){
+    try { localStorage.setItem(k, v); return; }
+    catch(e){
+      var msg = '数据未保存：本机存储写入失败（' + ((e&&e.message)||e) + '），已自动下载兜底文件';
+      if (window.__hubStoreFail){ window.__hubStoreFail(msg); return; }
+      alert(msg);
+      try {
+        var o = { schema:1, savedAt:new Date().toISOString(), reason:'storage-fallback' };
+        for (var i=0;i<localStorage.length;i++){ var kk=localStorage.key(i); if(kk && kk.indexOf('v2-')===0){ try{o[kk]=localStorage.getItem(kk);}catch(_){} } }
+        var b = new Blob([JSON.stringify(o,null,1)], { type:'application/json' });
+        var a = document.createElement('a'); a.href = URL.createObjectURL(b);
+        a.download = 'daily-hub-兜底-'+new Date().toISOString().replace(/[:.]/g,'-')+'.json';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      } catch(_){}
+    }
+  }
+
   /* ── 角标（自己建，不依赖页面 DOM）────────────────────────────── */
   var badge = null;
   function setBadge(text, color) {
@@ -93,7 +114,8 @@
     catch (e) { return []; }
   }
   function writeTable(k, arr) {
-    try { localStorage.setItem(LSK[k], JSON.stringify(arr)); } catch (e) {}
+    try { localStorage.setItem(LSK[k], JSON.stringify(arr)); }
+    catch (e) { if (window.__hubStoreFail) window.__hubStoreFail('☁ 写入 ' + k + ' 失败'); else console.error(e); }
   }
   function localSnapshot() {
     var o = { schema: 1, updated: new Date().toISOString(), source: 'daily-hub' };
@@ -123,7 +145,8 @@
     }
     /* 内容（今日任务 / 给爸消息 / 例行）：云端有就用云端（内容以云为权威） */
     if (cloud.content) {
-      try { localStorage.setItem(LSK.content, JSON.stringify(cloud.content)); } catch (e) {}
+      try { localStorage.setItem(LSK.content, JSON.stringify(cloud.content)); }
+      catch (e) { if (window.__hubStoreFail) window.__hubStoreFail('☁ 写入 content 失败'); else console.error(e); }
       if (window.__HUB_APPLY_CONTENT) { try { window.__HUB_APPLY_CONTENT(cloud.content); } catch (e) {} }
     }
     return added;
@@ -158,19 +181,10 @@
     });
   }
 
-  /* ── 本地写之后：只标记「待备份」，不发网络请求 ─────────────── */
+  /* ── 本地写之后：只标记「待备份」，不发网络请求（无定时器） ────── */
   function touch() {
     try { localStorage.setItem(DIRTY_KEY, String(Date.now())); } catch (e) {}
     setBadge('☁ 已存本机（待同步云端）', '#f39c12');
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(function () { timer = null; quiet(); }, 2500);
-  }
-  var timer = null;
-  function quiet() {
-    var d = 0;
-    try { d = Number(localStorage.getItem(DIRTY_KEY) || 0); } catch (e) {}
-    if (d) setBadge('☁ 已存本机（待同步云端）', '#f39c12');
-    else setBadge('☁ 已同步', '#2e7d32');
   }
 
   /* ── 导出：给「手动/自动备份到云端」用 ─────────────────────── */
