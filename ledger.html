@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#F6F4F0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>记账</title>
+<style>
+  :root{
+    --paper:#F6F4F0;
+    --card:#FFFFFF;
+    --ink:#171614;
+    --ink-2:#6F6A61;
+    --ink-3:#A8A29A;
+    --line:#E4DFD6;
+    --line-soft:#EFEBE3;
+    --red:#B23A28;
+    --red-soft:#FBEDEA;
+    --green:#2F6B57;
+    --green-soft:#EAF3EF;
+    --amber:#A9702A;
+    --amber-soft:#FBF2E3;
+    --amber-line:#E8D3AE;
+    --shadow:0 1px 2px rgba(23,22,20,.04), 0 6px 20px -14px rgba(23,22,20,.18);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);color:var(--ink);
+    font:15px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100dvh;
+  }
+  .num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum";}
+  .serif{font-family:Georgia,"Songti SC","Source Han Serif SC",serif;}
+
+  #app{
+    max-width:780px;margin:0 auto;
+    padding:calc(env(safe-area-inset-top) + 18px) 16px calc(env(safe-area-inset-bottom) + 28px);
+  }
+
+  /* ---------- 顶栏 ---------- */
+  header{
+    display:flex;align-items:flex-start;justify-content:space-between;
+    gap:10px;padding-bottom:14px;border-bottom:1px solid var(--line);
+  }
+  .brand{font-size:13px;letter-spacing:.22em;color:var(--ink-3);margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .bk{
+    border:1px solid var(--line);background:var(--card);color:var(--ink-2);
+    border-radius:999px;padding:3px 10px;font:inherit;font-size:11px;letter-spacing:0;
+    cursor:pointer;line-height:1.4;
+  }
+  .bk:active{background:var(--line-soft);}
+  body.backing .bk{background:var(--amber);border-color:var(--amber);color:#fff;}
+
+  /* ---------- 补记横幅 ---------- */
+  .backbar{
+    display:none;align-items:center;justify-content:space-between;gap:10px;
+    margin-top:12px;padding:10px 12px;border-radius:12px;
+    background:var(--amber-soft);border:1px solid var(--amber-line);
+    font-size:13px;color:#7A5218;
+  }
+  .backbar.on{display:flex;}
+  .backbar span{line-height:1.4;}
+  .backbar b{font-weight:600;color:#6B4610;}
+  .backbar button{
+    flex:0 0 auto;border:none;border-radius:9px;background:var(--amber);color:#fff;
+    font:inherit;font-size:12px;padding:7px 12px;cursor:pointer;
+  }
+  .backbar button:active{transform:scale(.96);}
+  .totals{display:flex;gap:22px;}
+  .tot .lb{font-size:11px;letter-spacing:.1em;color:var(--ink-3);margin-bottom:2px;white-space:nowrap;}
+  .tot .vv{font-size:21px;font-weight:600;line-height:1.1;white-space:nowrap;}
+  .tot.today .vv{color:var(--red);}
+  .tot.in .vv{color:var(--green);}
+  .bal{font-size:11px;letter-spacing:.06em;color:var(--ink-3);margin-top:7px;}
+  .bal b{color:var(--ink-2);font-weight:600;font-variant-numeric:tabular-nums;}
+  .bal b.neg{color:var(--red);}
+  .bal b.pos{color:var(--green);}
+  .gear{
+    width:32px;height:32px;border:1px solid var(--line);border-radius:50%;
+    background:var(--card);color:var(--ink-2);font-size:15px;line-height:1;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+    margin-top:2px;flex:0 0 auto;
+  }
+  .gear:active{transform:scale(.94);}
+
+  /* ---------- 横向表格 ---------- */
+  .tbl{margin-top:16px;}
+  .tbl-h{
+    display:flex;align-items:baseline;gap:8px;
+    padding:0 2px 7px;
+  }
+  .tbl-h .t{font-size:12px;letter-spacing:.2em;color:var(--ink-3);}
+  .tbl-h .t.out{color:#B98A7E;}
+  .tbl-h .t.in{color:#7FA396;}
+  .tbl-h .hint{font-size:11px;color:#BDB6AB;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .tbl-head{
+    display:grid;grid-template-columns:88px 1fr 1.25fr 58px;
+    gap:8px;padding:0 2px 8px;
+    font-size:11px;letter-spacing:.1em;color:var(--ink-3);
+  }
+  .tbl-head span:nth-child(2),.tbl-head span:nth-child(3){padding-left:10px;}
+  .rowm{
+    display:grid;grid-template-columns:88px 1fr 1.25fr 58px;
+    gap:8px;align-items:center;
+    background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:8px 8px 8px 12px;margin-bottom:7px;
+    transition:.14s ease;
+  }
+  .rowm:focus-within{
+    border-color:#CDBFAE;box-shadow:var(--shadow);transform:translateY(-1px);
+  }
+  .rowm .nm{
+    font-size:15px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .rowm input{
+    border:none;background:#FAF8F4;border-radius:8px;
+    padding:9px 10px;font:inherit;color:var(--ink);outline:none;min-width:0;width:100%;
+  }
+  .rowm input::placeholder{color:#C4BEB4;}
+  .rowm input:focus{background:#fff;box-shadow:inset 0 0 0 1.5px #D8CDBC;}
+  .rowm input.amt{
+    font-variant-numeric:tabular-nums;text-align:right;font-size:16px;font-weight:500;
+  }
+  .rowm input.note{font-size:14px;color:var(--ink-2);}
+  .rowm .go{
+    border:none;border-radius:9px;height:38px;
+    background:var(--ink);color:#fff;font:inherit;font-size:13px;
+    letter-spacing:.04em;cursor:pointer;transition:.12s ease;
+  }
+  .rowm .go:active{transform:scale(.95);}
+  .rowm.filled .go{background:var(--red);}
+
+  /* 收入行：绿色系，跟支出区分开 */
+  .rowm.in:focus-within{border-color:#BED4CA;}
+  .rowm.in input:focus{box-shadow:inset 0 0 0 1.5px #BFD8CE;}
+  .rowm.in.filled .go{background:var(--green);}
+
+  /* 补记态：按钮变琥珀 —— 提醒你这一笔不是记给今天的 */
+  body.backing .rowm.filled .go{background:var(--amber);}
+  body.backing .rowm.in.filled .go{background:var(--amber);}
+  body.backing .rowm:focus-within{border-color:var(--amber-line);}
+
+  /* ---------- 补记面板 ---------- */
+  .datein{
+    width:100%;border:1px solid var(--line);background:var(--card);border-radius:10px;
+    padding:12px;font:inherit;font-size:16px;color:var(--ink);outline:none;
+  }
+  .datein:focus{box-shadow:0 0 0 2px var(--line);}
+  .quick{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px;}
+  .quick button{
+    border:1px solid var(--line);background:var(--card);border-radius:10px;
+    padding:10px 2px;font:inherit;font-size:13px;color:var(--ink-2);cursor:pointer;
+  }
+  .quick button:active{background:var(--line-soft);}
+
+  /* ---------- 今日流水 ---------- */
+  .feed{margin-top:26px;}
+  .feed-h{
+    display:flex;justify-content:space-between;align-items:center;gap:10px;
+    padding-bottom:8px;border-bottom:1px solid var(--line);
+    font-size:11px;letter-spacing:.14em;color:var(--ink-3);
+  }
+  .fh-r{display:flex;align-items:center;gap:10px;flex:0 0 auto;}
+  .allbtn{
+    border:1px solid var(--line);background:var(--card);color:var(--ink-2);
+    border-radius:999px;padding:3px 9px;font:inherit;font-size:11px;letter-spacing:.02em;
+    cursor:pointer;line-height:1.4;white-space:nowrap;
+  }
+  .allbtn:active{background:var(--line-soft);}
+  .fr{
+    display:grid;grid-template-columns:44px 76px 1fr auto 24px;
+    gap:8px;align-items:center;padding:10px 2px;
+    border-bottom:1px solid var(--line-soft);
+  }
+  .fr:last-child{border-bottom:none;}
+  .fr .tm{font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums;}
+  .fr .nm{font-size:14px;}
+  .fr .nt{font-size:13px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .fr .am{font-size:15px;font-weight:600;color:var(--red);font-variant-numeric:tabular-nums;text-align:right;}
+  .fr .am.in{color:var(--green);}
+  .fr .dl{
+    border:none;background:none;color:#D3CDC3;font-size:17px;line-height:1;
+    cursor:pointer;padding:0;
+  }
+  .fr .dl:active{color:var(--red);}
+  .empty{padding:22px 0;text-align:center;font-size:13px;color:var(--ink-3);}
+
+  /* ---------- 全部记录（按天分组） ---------- */
+  .al-sum{
+    font-size:12px;color:var(--ink-3);line-height:1.7;
+    padding:10px 0 2px;letter-spacing:.02em;
+  }
+  .al-sum b{color:var(--ink-2);font-weight:600;font-variant-numeric:tabular-nums;}
+  .dg-h{
+    display:flex;align-items:center;gap:8px;
+    padding:14px 2px 4px;border-bottom:1px solid var(--line);
+  }
+  .dg-h .d{font-size:13px;font-weight:600;color:var(--ink);}
+  .dg-h .s{
+    font-size:11px;color:var(--ink-3);letter-spacing:.02em;
+    font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .dg-h .kx{
+    margin-left:auto;flex:0 0 auto;
+    border:1px solid #EBCFC9;background:none;color:var(--red);
+    border-radius:999px;font:inherit;font-size:11px;padding:3px 9px;cursor:pointer;
+  }
+  .dg-h .kx:active{background:var(--red-soft);}
+  /* 底部提示条会浮在面板上，给最后一行留出不被挡住的空间 */
+  #allSheet .sh-body{padding-bottom:76px;}
+
+  /* ---------- 设置面板 ---------- */
+  .mask{
+    position:fixed;inset:0;background:rgba(23,22,20,.3);opacity:0;pointer-events:none;
+    transition:.22s ease;z-index:40;backdrop-filter:blur(2px);
+  }
+  .mask.on{opacity:1;pointer-events:auto;}
+  .sheet{
+    position:fixed;left:0;right:0;bottom:0;z-index:50;
+    max-width:780px;margin:0 auto;
+    background:var(--paper);border-radius:22px 22px 0 0;
+    transform:translateY(102%);transition:transform .28s cubic-bezier(.32,.72,0,1);
+    max-height:88dvh;display:flex;flex-direction:column;
+    padding-bottom:calc(env(safe-area-inset-bottom) + 16px);
+    box-shadow:0 -12px 40px -18px rgba(23,22,20,.4);
+  }
+  .sheet.on{transform:translateY(0);}
+  .sh-top{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:18px 20px 8px;flex:0 0 auto;
+  }
+  .sh-top h2{margin:0;font-size:16px;font-weight:600;}
+  .sh-top .x{border:none;background:none;font-size:22px;line-height:1;color:var(--ink-3);cursor:pointer;}
+  .sh-body{overflow-y:auto;padding:0 20px 8px;-webkit-overflow-scrolling:touch;}
+  .sec{font-size:11px;letter-spacing:.14em;color:var(--ink-3);margin:18px 0 8px;}
+  .er{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line-soft);}
+  .er input{border:none;background:transparent;font:inherit;color:var(--ink);padding:4px 0;outline:none;min-width:0;}
+  .er input.nm{flex:1 1 auto;font-size:15px;}
+  .er input.df{width:80px;flex:0 0 auto;text-align:right;font-variant-numeric:tabular-nums;color:var(--ink-2);font-size:14px;}
+  .er input:focus{background:#fff;border-radius:6px;box-shadow:0 0 0 2px var(--line);}
+  .er .rm{border:none;background:none;color:#CFC9BF;font-size:18px;line-height:1;cursor:pointer;padding:2px 4px;flex:0 0 auto;}
+  .er .rm:active{color:var(--red);}
+  .add{display:flex;gap:8px;margin-top:12px;}
+  .add input{
+    flex:1 1 auto;border:1px solid var(--line);background:var(--card);border-radius:10px;
+    padding:11px 12px;font:inherit;font-size:14px;outline:none;min-width:0;
+  }
+  .add button{flex:0 0 auto;border:none;background:var(--ink);color:#fff;border-radius:10px;padding:0 16px;font:inherit;font-size:14px;cursor:pointer;}
+  .add.in button{background:var(--green);}
+  .tools{display:flex;gap:8px;margin-top:14px;}
+  .tools button{
+    flex:1 1 0;border:1px solid var(--line);background:var(--card);border-radius:10px;
+    padding:11px 8px;font:inherit;font-size:13px;color:var(--ink-2);cursor:pointer;
+  }
+  .tools button:active{background:var(--line-soft);}
+  .tools button.dg{color:var(--red);border-color:#EBCFC9;}
+  .tip{font-size:12px;color:var(--ink-3);line-height:1.65;margin-top:12px;}
+
+  #toast{
+    position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 40px);
+    transform:translate(-50%,12px);z-index:60;background:rgba(23,22,20,.92);color:#fff;
+    font-size:13px;padding:9px 16px;border-radius:999px;opacity:0;pointer-events:none;
+    transition:.2s ease;white-space:nowrap;
+    display:flex;align-items:center;gap:12px;max-width:calc(100vw - 28px);
+  }
+  #toast.on{opacity:1;transform:translate(-50%,0);pointer-events:auto;}
+  #toastMsg{overflow:hidden;text-overflow:ellipsis;}
+  #toastAct{
+    display:none;flex:0 0 auto;border:none;background:rgba(255,255,255,.18);color:#fff;
+    font:inherit;font-size:12px;padding:4px 11px;border-radius:999px;cursor:pointer;
+    line-height:1.4;
+  }
+  #toastAct.on{display:inline-block;}
+  #toastAct:active{background:rgba(255,255,255,.32);}
+
+  @media (max-width:460px){
+    .totals{gap:12px;}
+    .tot .lb{font-size:10px;letter-spacing:.04em;}
+    .tot .vv{font-size:18px;}
+  }
+  @media (max-width:420px){
+    .tbl-head,.rowm{grid-template-columns:72px 1fr 1fr 50px;gap:6px;}
+    .rowm{padding:7px 6px 7px 10px;}
+    .rowm .nm{font-size:14px;}
+    .rowm input.amt{font-size:15px;}
+    .fr{grid-template-columns:38px 64px 1fr auto 20px;gap:6px;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <div>
+      <div class="brand">记账 <span id="datelb">· 载入中</span><button class="bk" id="bkBtn">补记往日</button></div>
+      <div class="totals">
+        <div class="tot today"><div class="lb"><span id="dLab">今日支出</span></div><div class="vv num serif" id="dSum">¥0</div></div>
+        <div class="tot"><div class="lb">本月支出</div><div class="vv num serif" id="mSum">¥0</div></div>
+        <div class="tot in"><div class="lb">本月收入</div><div class="vv num serif" id="mIn">¥0</div></div>
+      </div>
+      <div class="bal" id="bal">本月结余 <b>—</b></div>
+    </div>
+    <div class="gear" id="gear" role="button" aria-label="设置">⋯</div>
+  </header>
+
+  <div class="backbar" id="backbar">
+    <span id="backtxt"></span>
+    <button id="backToday">回今天</button>
+  </div>
+
+  <div class="tbl">
+    <div class="tbl-h"><span class="t out">支出</span><span class="hint">金额 · 备注 · 回车记下</span></div>
+    <div class="tbl-head">
+      <span>项目</span><span>金额</span><span>备注</span><span></span>
+    </div>
+    <div id="rows"></div>
+  </div>
+
+  <div class="tbl">
+    <div class="tbl-h"><span class="t in">收入</span><span class="hint">进账也这么记</span></div>
+    <div class="tbl-head">
+      <span>项目</span><span>金额</span><span>备注</span><span></span>
+    </div>
+    <div id="inrows"></div>
+  </div>
+
+  <div class="feed">
+    <div class="feed-h">
+      <span id="feedTitle">今天</span>
+      <span class="fh-r">
+        <span id="cnt">0 笔</span>
+        <button class="allbtn" id="allBtn">全部记录 ›</button>
+      </span>
+    </div>
+    <div id="list"></div>
+  </div>
+
+</div>
+
+<div class="mask" id="mask"></div>
+<div class="sheet" id="sheet">
+  <div class="sh-top">
+    <h2>固定项目与数据</h2>
+    <button class="x" id="closeSheet">×</button>
+  </div>
+  <div class="sh-body">
+    <div class="sec">支出项目（名字可以改，右侧是「默认金额」）</div>
+    <div id="editOut"></div>
+    <div class="add">
+      <input id="newOut" placeholder="新支出项目，比如「话费」" maxlength="10">
+      <button id="addOutBtn">添加</button>
+    </div>
+
+    <div class="sec">收入项目</div>
+    <div id="editIn"></div>
+    <div class="add in">
+      <input id="newIn" placeholder="新收入项目，比如「兼职」" maxlength="10">
+      <button id="addInBtn">添加</button>
+    </div>
+
+    <div class="tip">
+      「默认金额」填了数（比如房租 700），那一行不填数直接点「记」就按这个数记；填 0 或者留空，就是每次都要手填。
+      工资、起凡这种每月金额不固定的，建议默认留空。
+    </div>
+
+    <div class="sec">数据</div>
+    <div class="tools">
+      <button id="expBtn">导出备份</button>
+      <button id="impBtn">导入备份</button>
+      <button class="dg" id="clrBtn">清空全部</button>
+    </div>
+    <input type="file" id="impFile" accept=".json,application/json" style="display:none">
+    <div class="tip" id="stat"></div>
+  </div>
+</div>
+
+<div class="sheet" id="bkSheet">
+  <div class="sh-top">
+    <h2>补记往日</h2>
+    <button class="x" id="bkClose">×</button>
+  </div>
+  <div class="sh-body">
+    <div class="sec">选哪一天</div>
+    <input type="date" id="bkDate" class="datein">
+    <div class="quick">
+      <button data-back="1">昨天</button>
+      <button data-back="2">前天</button>
+      <button data-back="3">3 天前</button>
+      <button data-back="7">一周前</button>
+    </div>
+    <div class="tip">
+      选好日期后回到上面，填金额点「记」—— 那几笔就记到这一天。
+      顶部会出现一条提示，记完点「回今天」继续记当天。
+    </div>
+    <div class="tip" id="bkStat"></div>
+    <div class="tools" style="margin-top:16px">
+      <button id="bkGoToday">回到今天</button>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="allSheet">
+  <div class="sh-top">
+    <h2 id="allTitle">全部记录</h2>
+    <button class="x" id="allClose">×</button>
+  </div>
+  <div class="sh-body">
+    <div class="al-sum" id="allSum"></div>
+    <div id="allList"></div>
+  </div>
+</div>
+
+<div id="toast"><span id="toastMsg"></span><button id="toastAct">撤销</button></div>
+
+<script>
+(function(){
+  'use strict';
+
+  var KEY = 'ledger_v1';
+  var VER = 2;
+
+  // 补记：null = 记今天；'YYYY-MM-DD' = 这一笔记给那一天
+  var BACK = null;
+
+  var DEFAULTS = {
+    v: VER,
+    cats: [
+      { id:'c1', name:'吃饭',   def:0 },
+      { id:'c2', name:'交通',   def:0 },
+      { id:'c3', name:'房租',   def:700 },
+      { id:'c4', name:'日用',   def:0 },
+      { id:'c5', name:'花呗',   def:0 },
+      { id:'c6', name:'其他',   def:0 }
+    ],
+    incats: [
+      { id:'i1', name:'工资',   def:0 },
+      { id:'i2', name:'三角洲', def:0 },
+      { id:'i3', name:'起凡',   def:0 }
+    ],
+    recs: []
+  };
+
+  var _needSave = false;
+  var S = load();
+  if(_needSave) save();
+
+  /* ---------- 存取 ---------- */
+  function normCats(arr){
+    if(!Array.isArray(arr)) return [];
+    return arr.map(function(c,i){
+      return {
+        id: c && c.id ? String(c.id) : ('x'+(i+1)),
+        name: String((c && c.name) || '未命名'),
+        def: Number(c && c.def) || 0
+      };
+    });
+  }
+
+  function load(){
+    try{
+      var raw = localStorage.getItem(KEY);
+      if(!raw) return JSON.parse(JSON.stringify(DEFAULTS));
+      var d = JSON.parse(raw);
+      if(!d || !Array.isArray(d.cats) || !Array.isArray(d.recs)) throw 0;
+
+      var oldVer = !d.v || Number(d.v) < VER;
+      d.cats   = normCats(d.cats);
+      d.incats = normCats(d.incats);
+      var hadInc = Array.isArray(d.incats) && d.incats.length > 0;
+
+      // 老数据升级：只有「以前完全没有收入项目」时才补默认的三个
+      if(oldVer && !hadInc){
+        d.incats = JSON.parse(JSON.stringify(DEFAULTS.incats));
+        _needSave = true;
+      }
+
+      var hadKind = false;
+      d.recs = d.recs.map(function(r){
+        if(r && r.kind) hadKind = true;
+        return {
+          id: r && r.id ? String(r.id) : uid(),
+          t: Number(r && r.t) || Date.now(),
+          cat: (r && r.cat) ? String(r.cat) : '',
+          name: String((r && r.name) || '其他'),
+          amt: Number(r && r.amt) || 0,
+          note: String((r && r.note) || ''),
+          // 老记录没有 kind → 一律当支出，不能凭空变成收入
+          kind: (r && r.kind === 'in') ? 'in' : 'out'
+        };
+      });
+      if(oldVer && d.recs.length && !hadKind) _needSave = true;
+
+      if(oldVer) _needSave = true;
+      d.v = VER;
+      return d;
+    }catch(e){ return JSON.parse(JSON.stringify(DEFAULTS)); }
+  }
+  function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){ toast('保存失败：存储空间满了'); } }
+  function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+
+  /* ---------- 工具 ---------- */
+  function money(n){
+    var v = Math.round(Number(n) * 100) / 100;
+    var s = Math.abs(v).toFixed(2).replace(/\.00$/,'');
+    var p = s.split('.');
+    p[0] = p[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return (v < 0 ? '-' : '') + p.join('.');
+  }
+  function sameDay(a,b){
+    return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+  }
+  /* ---------- 补记用日期助手 ---------- */
+  function pad2(n){ return ('0' + n).slice(-2); }
+  function ymd(d){ return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate()); }
+  function parseYmd(s){
+    var p = String(s).split('-');
+    if(p.length !== 3) return new Date();
+    return new Date(Number(p[0]), Number(p[1])-1, Number(p[2]));
+  }
+  // 当前「关注」的那一天：补记态 = 所选日期，否则 = 今天
+  function focusDate(){ return BACK ? parseYmd(BACK) : new Date(); }
+  // 这一笔落在什么时刻：补记态沿用「现在的时:分」，只是换到那一天
+  function recTime(){
+    if(!BACK) return Date.now();
+    var n = new Date(), f = parseYmd(BACK);
+    return new Date(f.getFullYear(), f.getMonth(), f.getDate(),
+                    n.getHours(), n.getMinutes(), n.getSeconds(), n.getMilliseconds()).getTime();
+  }
+  function hhmm(ts){
+    var d = new Date(ts);
+    return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
+  }
+  function esc(s){
+    return String(s).replace(/[&<>"']/g,function(m){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];
+    });
+  }
+  var tt=null;
+  function toast(msg, act){
+    var el    = document.getElementById('toast');
+    var msgEl = document.getElementById('toastMsg');
+    var actEl = document.getElementById('toastAct');
+    if(!el || !msgEl || !actEl) return;
+    msgEl.textContent = msg;
+    if(act && act.fn){
+      actEl.textContent = act.label || '撤销';
+      actEl.classList.add('on');
+      actEl.onclick = function(){
+        actEl.classList.remove('on');
+        el.classList.remove('on');
+        clearTimeout(tt);
+        act.fn();
+      };
+    }else{
+      actEl.classList.remove('on');
+      actEl.onclick = null;
+    }
+    el.classList.add('on');
+    clearTimeout(tt);
+    tt = setTimeout(function(){ el.classList.remove('on'); },
+                    (act && act.fn) ? 5000 : 1600);
+  }
+  function isIn(r){ return r.kind === 'in'; }
+
+  /* ---------- 渲染表格行 ---------- */
+  function renderRows(){
+    drawTable('rows', S.cats, 'out');
+    drawTable('inrows', S.incats, 'in');
+  }
+
+  function drawTable(boxId, arr, kind){
+    var box = document.getElementById(boxId);
+    if(!box) return;
+    box.innerHTML = '';
+    arr.forEach(function(c){
+      var row = document.createElement('div');
+      row.className = 'rowm' + (kind === 'in' ? ' in' : '');
+      row.innerHTML =
+        '<div class="nm" title="'+esc(c.name)+'">'+esc(c.name)+'</div>' +
+        '<input class="amt num" type="text" inputmode="decimal" autocomplete="off" ' +
+               'data-amt="'+esc(c.id)+'" data-k="'+kind+'" placeholder="'+(c.def>0?money(c.def):'0')+'">' +
+        '<input class="note" type="text" autocomplete="off" data-note="'+esc(c.id)+'" data-k="'+kind+'" placeholder="备注…">' +
+        '<button class="go" data-go="'+esc(c.id)+'" data-k="'+kind+'">记</button>';
+
+      var amtEl  = row.querySelector('[data-amt]');
+      var noteEl = row.querySelector('[data-note]');
+      var goEl   = row.querySelector('[data-go]');
+
+      amtEl.addEventListener('input', function(){
+        row.classList.toggle('filled', amtEl.value.trim() !== '');
+      });
+      amtEl.addEventListener('keydown', function(e){
+        if(e.key === 'Enter'){ e.preventDefault(); noteEl.focus(); }
+      });
+      noteEl.addEventListener('keydown', function(e){
+        if(e.key === 'Enter'){ e.preventDefault(); submit(c, kind); }
+      });
+      goEl.addEventListener('click', function(){ submit(c, kind); });
+
+      box.appendChild(row);
+    });
+  }
+
+  /* ---------- 提交一笔 ---------- */
+  function submit(c, kind){
+    kind = kind === 'in' ? 'in' : 'out';
+    var amtEl  = document.querySelector('[data-amt="'+c.id+'"][data-k="'+kind+'"]');
+    var noteEl = document.querySelector('[data-note="'+c.id+'"][data-k="'+kind+'"]');
+    if(!amtEl) return;
+
+    var raw = amtEl.value.trim();
+    var amt = raw === '' ? Number(c.def) : Number(raw);
+
+    if(!isFinite(amt) || amt <= 0){
+      toast(raw === '' ? (c.name + ' 还没填金额') : '金额不对');
+      amtEl.focus();
+      return;
+    }
+    var note = noteEl ? noteEl.value.trim() : '';
+
+    S.recs.push({ id:uid(), t:recTime(), cat:c.id, name:c.name, amt:amt, note:note, kind:kind });
+    save();
+
+    amtEl.value = '';
+    if(noteEl) noteEl.value = '';
+    var box = amtEl.closest('.rowm');
+    if(box) box.classList.remove('filled');
+    renderFeed();
+    renderSums();
+    var pre = '';
+    if(BACK){
+      var f = parseYmd(BACK);
+      pre = '补记 ' + (f.getMonth()+1) + '/' + f.getDate() + ' · ';
+    }
+    toast(pre + (kind === 'in' ? '收入 +' : '记下 ') + c.name + ' ¥' + money(amt) + (note ? ' · ' + note : ''));
+    amtEl.focus();
+  }
+
+  /* ---------- 流水 ---------- */
+  function renderFeed(){
+    var fd = focusDate();
+    var day = S.recs.filter(function(r){ return sameDay(new Date(r.t), fd); })
+                    .sort(function(a,b){ return b.t - a.t; });
+    var list = document.getElementById('list');
+    list.innerHTML = '';
+    if(!day.length){
+      list.innerHTML = BACK
+        ? '<div class="empty">这一天还没记过。上面某一行填个金额，点「记」。</div>'
+        : '<div class="empty">今天还没记。上面某一行填个金额，点「记」。</div>';
+    }else{
+      day.forEach(function(r){
+        var inc = isIn(r);
+        var el = document.createElement('div');
+        el.className = 'fr';
+        el.innerHTML =
+          '<span class="tm">'+hhmm(r.t)+'</span>' +
+          '<span class="nm">'+esc(r.name)+'</span>' +
+          '<span class="nt">'+esc(r.note || '')+'</span>' +
+          '<span class="am'+(inc?' in':'')+'">'+(inc?'+':'-')+'¥'+money(r.amt)+'</span>' +
+          '<button class="dl" aria-label="删除">×</button>';
+        el.querySelector('.dl').onclick = function(){
+          doDelete([r.id], (inc ? '收入 ' : '') + r.name + ' ¥' + money(r.amt));
+        };
+        list.appendChild(el);
+      });
+    }
+    var nIn  = day.filter(isIn).length;
+    var nOut = day.length - nIn;
+    var cntEl = document.getElementById('cnt');
+    cntEl.textContent = (nIn && nOut) ? ('支 '+nOut+' · 收 '+nIn) : (day.length + ' 笔');
+
+    var ft = document.getElementById('feedTitle');
+    if(ft){
+      ft.textContent = BACK
+        ? ((fd.getMonth()+1) + '月' + fd.getDate() + '日 ' + WEEK[fd.getDay()])
+        : '今天';
+    }
+  }
+
+  function renderSums(){
+    var now = new Date();
+    var fd  = focusDate();
+    var monthRecs = S.recs.filter(function(r){
+      var d = new Date(r.t);
+      return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth();
+    });
+    function sum(arr){ return arr.reduce(function(a,r){ return a + r.amt; }, 0); }
+
+    // 第一格 = 「关注的那一天」的支出：平时是今天，补记时是所选那天
+    var dOut = sum(S.recs.filter(function(r){ return sameDay(new Date(r.t), fd) && !isIn(r); }));
+    var mOut = sum(monthRecs.filter(function(r){ return !isIn(r); }));
+    var mIn  = sum(monthRecs.filter(isIn));
+
+    var dLab = document.getElementById('dLab');
+    if(dLab){
+      dLab.textContent = BACK ? ((fd.getMonth()+1) + '/' + fd.getDate() + ' 支出') : '今日支出';
+    }
+
+    document.getElementById('dSum').textContent = '¥' + money(dOut);
+    document.getElementById('mSum').textContent = '¥' + money(mOut);
+    document.getElementById('mIn').textContent  = '¥' + money(mIn);
+
+    var bal = mIn - mOut;
+    var balEl = document.getElementById('bal');
+    balEl.innerHTML = '本月结余 <b class="' + (bal < 0 ? 'neg' : (bal > 0 ? 'pos' : '')) + '">' +
+                      (bal > 0 ? '+' : (bal < 0 ? '-' : '')) + '¥' + money(Math.abs(bal)) + '</b>';
+  }
+
+  /* ---------- 删除 / 撤销 ---------- */
+  var _del = null;   // 最近一次被删的记录，撤销用
+  function doDelete(ids, label){
+    var gone = S.recs.filter(function(r){ return ids.indexOf(r.id) >= 0; });
+    if(!gone.length) return;
+    _del = { items: JSON.parse(JSON.stringify(gone)) };
+    S.recs = S.recs.filter(function(r){ return ids.indexOf(r.id) < 0; });
+    save();
+    renderFeed(); renderSums(); renderAllList();
+    toast('已删 ' + label, { label: '撤销', fn: undoDelete });
+  }
+  function undoDelete(){
+    if(!_del || !_del.items.length) return;
+    _del.items.forEach(function(it){ S.recs.push(it); });
+    _del = null;
+    save();
+    renderFeed(); renderSums(); renderAllList();
+    toast('已撤销，记回来了');
+  }
+
+  /* ---------- 全部记录（按天分组，可逐条删 / 删整天） ---------- */
+  function allOpen(){
+    var sh = document.getElementById('allSheet');
+    return !!(sh && sh.classList.contains('on'));
+  }
+  function renderAllList(){
+    var box = document.getElementById('allList');
+    if(!box || !allOpen()) return;
+    box.innerHTML = '';
+
+    var total = S.recs.length;
+    var outT = S.recs.filter(function(r){ return !isIn(r); })
+                     .reduce(function(a,r){ return a + r.amt; }, 0);
+    var inT  = S.recs.filter(isIn).reduce(function(a,r){ return a + r.amt; }, 0);
+
+    var titleEl = document.getElementById('allTitle');
+    if(titleEl) titleEl.textContent = '全部记录 · ' + total + ' 笔';
+
+    var sumEl = document.getElementById('allSum');
+    if(sumEl){
+      var bal = inT - outT;
+      var balStr = (bal > 0 ? '+' : (bal < 0 ? '-' : '')) + '¥' + money(Math.abs(bal));
+      sumEl.innerHTML = total
+        ? ('支出累计 <b>¥' + money(outT) + '</b>　收入累计 <b>¥' + money(inT) +
+           '</b>　结余 <b>' + balStr + '</b><br>' +
+           '删错了别慌 —— 底部提示条里有「撤销」，5 秒内有效。')
+        : '';
+    }
+
+    if(!total){
+      box.innerHTML = '<div class="empty">还没有任何记录。</div>';
+      return;
+    }
+
+    var groups = {};
+    S.recs.forEach(function(r){
+      var k = ymd(new Date(r.t));
+      if(!groups[k]) groups[k] = [];
+      groups[k].push(r);
+    });
+    var keys = Object.keys(groups).sort().reverse();
+
+    keys.forEach(function(k){
+      var items = groups[k].slice().sort(function(a,b){ return b.t - a.t; });
+      var d  = parseYmd(k);
+      var o  = items.filter(function(r){ return !isIn(r); });
+      var i  = items.filter(isIn);
+      var oS = o.reduce(function(a,r){ return a + r.amt; }, 0);
+      var iS = i.reduce(function(a,r){ return a + r.amt; }, 0);
+
+      var bits = [];
+      if(o.length) bits.push('支 ' + o.length);
+      if(i.length) bits.push('收 ' + i.length);
+      var moneyBits = [];
+      if(o.length) moneyBits.push('-¥' + money(oS));
+      if(i.length) moneyBits.push('+¥' + money(iS));
+
+      var head = document.createElement('div');
+      head.className = 'dg-h';
+      head.innerHTML =
+        '<span class="d">' + (d.getMonth()+1) + '月' + d.getDate() + '日 ' + WEEK[d.getDay()] + '</span>' +
+        '<span class="s">' + bits.join(' · ') + '　' + moneyBits.join(' ') + '</span>' +
+        '<button class="kx">删这天</button>';
+      head.querySelector('.kx').onclick = function(){
+        if(!confirm('删掉 ' + (d.getMonth()+1) + '月' + d.getDate() + '日 这 ' +
+                    items.length + ' 笔？删错了可以撤销。')) return;
+        doDelete(items.map(function(r){ return r.id; }),
+                 (d.getMonth()+1) + '/' + d.getDate() + ' 的 ' + items.length + ' 笔');
+      };
+      box.appendChild(head);
+
+      items.forEach(function(r){
+        var inc = isIn(r);
+        var el = document.createElement('div');
+        el.className = 'fr';
+        el.innerHTML =
+          '<span class="tm">' + hhmm(r.t) + '</span>' +
+          '<span class="nm">' + esc(r.name) + '</span>' +
+          '<span class="nt">' + esc(r.note || '') + '</span>' +
+          '<span class="am' + (inc ? ' in' : '') + '">' + (inc ? '+' : '-') + '¥' + money(r.amt) + '</span>' +
+          '<button class="dl" aria-label="删除">×</button>';
+        el.querySelector('.dl').onclick = function(){
+          doDelete([r.id], (inc ? '收入 ' : '') + r.name + ' ¥' + money(r.amt));
+        };
+        box.appendChild(el);
+      });
+    });
+  }
+  function openAll(){
+    closeSheet(); closeBk();
+    document.getElementById('mask').classList.add('on');
+    document.getElementById('allSheet').classList.add('on');
+    renderAllList();
+  }
+  function closeAll(){
+    document.getElementById('mask').classList.remove('on');
+    document.getElementById('allSheet').classList.remove('on');
+  }
+
+  function dayKey(d){
+    d = d || new Date();
+    return d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate();
+  }
+  var WEEK = ['周日','周一','周二','周三','周四','周五','周六'];
+  function renderDate(){
+    var d = new Date();
+    var el = document.getElementById('datelb');
+    if(!el) return;
+    var t = BACK ? parseYmd(BACK) : d;
+    el.textContent = '· ' + (BACK ? '补记 ' : '') +
+                     (t.getMonth()+1) + '月' + t.getDate() + '日 ' + WEEK[t.getDay()];
+  }
+
+  /* ---------- 补记态：横幅 + 入口按钮文案 ---------- */
+  function renderBack(){
+    var bar = document.getElementById('backbar');
+    var txt = document.getElementById('backtxt');
+    var btn = document.getElementById('bkBtn');
+    if(BACK){
+      var f = parseYmd(BACK);
+      if(txt){
+        txt.innerHTML = '正在补记 <b>' + (f.getMonth()+1) + '月' + f.getDate() + '日 ' +
+                        WEEK[f.getDay()] + '</b> —— 点「记」会记到这天';
+      }
+      if(bar) bar.classList.add('on');
+      if(btn) btn.textContent = '换日期';
+    }else{
+      if(bar) bar.classList.remove('on');
+      if(btn) btn.textContent = '补记往日';
+    }
+    document.body.classList.toggle('backing', !!BACK);
+  }
+
+  function renderAll(){ renderRows(); renderFeed(); renderSums(); renderDate(); renderBack(); renderAllList(); }
+
+  /* ---------- 设置 ---------- */
+  function renderEdit(){
+    drawEdit('editOut', S.cats, 'out');
+    drawEdit('editIn',  S.incats, 'in');
+
+    var outT = S.recs.filter(function(r){ return !isIn(r); }).reduce(function(a,r){ return a + r.amt; }, 0);
+    var inT  = S.recs.filter(isIn).reduce(function(a,r){ return a + r.amt; }, 0);
+    document.getElementById('stat').textContent =
+      '共 ' + S.recs.length + ' 笔 ｜ 支出累计 ¥' + money(outT) + ' · 收入累计 ¥' + money(inT) +
+      '。数据只存在这台设备的浏览器里，换手机或清缓存会丢 —— 偶尔点「导出备份」。';
+  }
+
+  function drawEdit(boxId, arr, kind){
+    var box = document.getElementById(boxId);
+    if(!box) return;
+    box.innerHTML = '';
+    arr.forEach(function(c){
+      var row = document.createElement('div');
+      row.className = 'er';
+
+      var nm = document.createElement('input');
+      nm.className = 'nm'; nm.value = c.name; nm.maxLength = 10;
+      nm.onchange = function(){
+        c.name = nm.value.trim() || c.name;
+        nm.value = c.name; save(); renderAll();
+      };
+
+      var df = document.createElement('input');
+      df.className = 'df num'; df.type = 'number'; df.inputMode = 'decimal';
+      df.value = c.def || ''; df.placeholder = '默认';
+      df.onchange = function(){
+        c.def = Math.max(0, Number(df.value) || 0);
+        df.value = c.def || ''; save(); renderRows();
+      };
+
+      var rm = document.createElement('button');
+      rm.className = 'rm'; rm.textContent = '×';
+      rm.onclick = function(){
+        if(arr.length <= 1){ toast('至少留一项'); return; }
+        if(!confirm('删掉「'+c.name+'」这一行？已经记过的账不会丢。')) return;
+        var list = S[kind === 'in' ? 'incats' : 'cats'];
+        var i = list.indexOf(c);
+        if(i >= 0) list.splice(i, 1);
+        save(); renderEdit(); renderAll();
+      };
+
+      row.appendChild(nm); row.appendChild(df); row.appendChild(rm);
+      box.appendChild(row);
+    });
+  }
+  function openSheet(){
+    renderEdit();
+    document.getElementById('mask').classList.add('on');
+    document.getElementById('sheet').classList.add('on');
+  }
+  function closeSheet(){
+    document.getElementById('mask').classList.remove('on');
+    document.getElementById('sheet').classList.remove('on');
+  }
+
+  /* ---------- 导出 / 导入 ---------- */
+  function exportJSON(){
+    var blob = new Blob([JSON.stringify(S, null, 2)], {type:'application/json'});
+    var d = new Date();
+    var stamp = d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '记账备份-'+stamp+'.json';
+    a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+    toast('已导出备份文件');
+  }
+  function importJSON(file){
+    var fr = new FileReader();
+    fr.onload = function(){
+      try{
+        var d = JSON.parse(fr.result);
+        if(!d.cats || !d.recs) throw new Error('bad');
+        if(!confirm('导入会用备份里的 '+d.recs.length+' 笔替换现在这 '+S.recs.length+' 笔，确定？')) return;
+        localStorage.setItem(KEY, JSON.stringify(d));
+        S = load(); renderAll(); renderEdit(); toast('导入完成');
+      }catch(e){ toast('导入失败：文件格式不认识'); }
+    };
+    fr.readAsText(file);
+  }
+
+  /* ---------- 绑定 ---------- */
+  document.getElementById('gear').addEventListener('click', openSheet);
+  document.getElementById('closeSheet').addEventListener('click', closeSheet);
+  document.getElementById('mask').addEventListener('click', function(){
+    closeSheet(); closeBk(); closeAll();
+  });
+
+  function bindAdd(inputId, btnId, kind){
+    var inp = document.getElementById(inputId);
+    var btn = document.getElementById(btnId);
+    function add(){
+      var name = inp.value.trim();
+      if(!name){ inp.focus(); return; }
+      var list = S[kind === 'in' ? 'incats' : 'cats'];
+      var prefix = (kind === 'in' ? 'i' : 'c') + Date.now().toString(36);
+      list.push({ id: prefix, name: name, def: 0 });
+      inp.value = '';
+      save(); renderEdit(); renderAll();
+      toast('已添加「'+name+'」');
+    }
+    btn.addEventListener('click', add);
+    inp.addEventListener('keydown', function(e){
+      if(e.key === 'Enter'){ e.preventDefault(); add(); }
+    });
+  }
+  bindAdd('newOut', 'addOutBtn', 'out');
+  bindAdd('newIn',  'addInBtn',  'in');
+
+  document.getElementById('expBtn').addEventListener('click', exportJSON);
+  document.getElementById('impBtn').addEventListener('click', function(){
+    document.getElementById('impFile').click();
+  });
+  document.getElementById('impFile').addEventListener('change', function(e){
+    if(e.target.files && e.target.files[0]) importJSON(e.target.files[0]);
+    e.target.value = '';
+  });
+  document.getElementById('clrBtn').addEventListener('click', function(){
+    if(!confirm('清空全部 '+S.recs.length+' 笔？不能撤销，建议先导出备份。')) return;
+    S.recs = []; save(); renderFeed(); renderSums(); renderEdit(); toast('已清空');
+  });
+
+  /* ---------- 补记往日 ---------- */
+  function clearInputs(){
+    var els = document.querySelectorAll('#rows input, #inrows input');
+    for(var i = 0; i < els.length; i++) els[i].value = '';
+    var rows = document.querySelectorAll('.rowm');
+    for(var j = 0; j < rows.length; j++) rows[j].classList.remove('filled');
+  }
+
+  function bkStatText(d){
+    var n = S.recs.filter(function(r){ return sameDay(new Date(r.t), d); }).length;
+    var el = document.getElementById('bkStat');
+    if(el) el.textContent = '这天现在有 ' + n + ' 笔记录。';
+    return n;
+  }
+
+  function openBk(){
+    var base = BACK ? parseYmd(BACK) : new Date();
+    var dEl = document.getElementById('bkDate');
+    dEl.value = ymd(base);
+    dEl.max = ymd(new Date());
+    bkStatText(base);
+    closeSheet();
+    document.getElementById('mask').classList.add('on');
+    document.getElementById('bkSheet').classList.add('on');
+  }
+  function closeBk(){
+    document.getElementById('mask').classList.remove('on');
+    document.getElementById('bkSheet').classList.remove('on');
+  }
+
+  function setBack(ds){
+    if(ds){
+      var today = ymd(new Date());
+      if(ds > today){ toast('不能补记以后的日子'); return; }
+      // 选「今天」= 等同于回今天，不该挂着补记横幅
+      BACK = (ds === today) ? null : ds;
+    }else{
+      BACK = null;
+    }
+    clearInputs();
+    renderAll();
+    closeBk();
+    if(BACK){
+      var fd = parseYmd(BACK);
+      toast('已切到 ' + (fd.getMonth()+1) + '月' + fd.getDate() + '日，现在记的账都进这天');
+    }else{
+      toast('已回到今天');
+    }
+  }
+
+  document.getElementById('bkBtn').addEventListener('click', openBk);
+  document.getElementById('bkClose').addEventListener('click', closeBk);
+
+  document.getElementById('allBtn').addEventListener('click', openAll);
+  document.getElementById('allClose').addEventListener('click', closeAll);
+  document.getElementById('backToday').addEventListener('click', function(){ setBack(null); });
+  document.getElementById('bkGoToday').addEventListener('click', function(){ setBack(null); });
+  document.getElementById('bkDate').addEventListener('change', function(){
+    if(this.value) setBack(this.value);
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.quick [data-back]'), function(b){
+    b.addEventListener('click', function(){
+      var n = Number(b.getAttribute('data-back')) || 0;
+      var d = new Date();
+      d.setDate(d.getDate() - n);
+      setBack(ymd(d));
+    });
+  });
+
+  renderAll();
+
+  /* ---------- 「网页常开不关」的三道自愈 ---------- */
+  // ① 跨天：页面开过夜，第二天必须自动翻页 —— 否则顶部「今天」一直显示昨天的数
+  var _day = dayKey();
+  setInterval(function(){
+    var k = dayKey();
+    if(k !== _day){
+      _day = k;
+      renderDate(); renderFeed(); renderSums();
+      if(BACK){
+        var f = parseYmd(BACK);
+        toast('新的一天了，但还在补记 ' + (f.getMonth()+1) + '/' + f.getDate());
+      }else{
+        toast('已经是新的一天了');
+      }
+    }
+  }, 30000);
+
+  // ② 多标签：另一个标签记了账 / 改了项目，这个标签要跟上
+  window.addEventListener('storage', function(e){
+    if(e.key !== KEY) return;
+    S = load();
+    renderRows(); renderFeed(); renderSums();
+  });
+
+  // ③ 切回页面：重算一次（电脑睡眠唤醒、跨天都可能让定时器错过）
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState !== 'visible') return;
+    _day = dayKey();
+    renderDate(); renderFeed(); renderSums();
+  });
+})();
+</script>
+</body>
+</html>
