@@ -13,16 +13,17 @@
    daily-hub · v2 工作台（本地版）
    调色板沿用 v1 的 "Amber Ops"（暖纸 + 品牌橙）。
    约束（红线，一律不改）：
-     ① 口令门保留，口令「我爱凌波」；
+     ① 🔴 2026-11-02 他口述「把口令删了 以后我没说要加口令的就不要口令」
+        → **口令门已删除，打开直接进**；`PASS` 常量保留但**只用于解密云端备份**，
+        不再做界面校验（删了它备份就解不开）；
      ② 云端表名 notes、字段名 day/kind/body/done 原样保留（本版虽走本机，
         对象仍用这些键名，将来要接回云端无需改字段）。
    v2 本地版变化：
-     ① 去掉云端登录：打开→输口令→直接进主界面，再无任何登录验证 /
-        邮箱验证码之类的挡路提示；
+     ① 去掉云端登录与口令门：打开→直接进主界面，再无任何验证 / 验证码挡路；
      ② 数据全部走本机 localStorage（键名加 v2- 前缀，不与 v1 串）；
      ③ 内联离线快照保留（SNAPSHOT 标记 + 任务数据），首次进入自动种入
         本地任务列表，保证任何时候（断网 / 无登录）打开都能看到任务；
-     ④ 其余：口令门、七类记录、给爸消息、喝水浮层与 v1 一致。
+     ④ 其余：七类记录、给爸消息、喝水浮层与 v1 一致（口令门已按他 2026-11-02 要求删除）。
    ══════════════════════════════════════════════════════════════ */
 :root{
   --page:#f4f0e9;
@@ -288,7 +289,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 </head>
 <body>
 
-<div id="gate">
+<div id="gate" hidden>
   <div class="card">
     <h1>Notes · v2</h1>
     <div class="sub">输入口令进入</div>
@@ -298,7 +299,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   </div>
 </div>
 
-<div id="app" hidden>
+<div id="app">
   <div id="storeStatus" class="statusbar"></div>
   <div class="hd">
     <div>
@@ -420,11 +421,11 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 <script>
 /* ══ 约束红线 ══
-   ① 口令门保留，口令 = 「我爱凌波」；
+   ① 🔴 口令门已删除（他 2026-11-02：「把口令删了 以后我没说要加口令的就不要口令」）
+      ⇒ 打开直接进主界面；`PASS` 保留**仅作云端备份解密密钥**，不做界面校验；
    ② 云端表名 notes、字段名 day/kind/body/done 一律不改（本版走本机，
       但存储对象仍用这些键名，将来接回云端无需改字段）。
-   本版：去掉云端登录与 SDK，数据全部走 localStorage（v2- 前缀），
-        输口令后直接进主界面。 */
+   本版：去掉云端登录与 SDK，数据全部走 localStorage（v2- 前缀），打开即进主界面。 */
 const PASS = '我爱凌波';
 const KEY  = 'v2-ok';
 
@@ -877,7 +878,9 @@ function enter(){
   if (window.HUBSYNC) { window.HUBSYNC.unlock($('pw').value || PASS); }
   try { if (window.__HUB_STATUS_REFRESH) window.__HUB_STATUS_REFRESH(); } catch(e){}
 }
-if (localStorage.getItem(KEY) === '1') enter();
+/* 2026-11-02 他口述「把口令删了」：不再走口令门，打开直接进。
+   注意 PASS 常量保留 —— 它仍是云端加密备份的解密密钥，删了备份就解不开。 */
+enter();
 
 /* 渲染 */
 function syncTab(){
