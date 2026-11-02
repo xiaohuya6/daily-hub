@@ -423,6 +423,30 @@
   var KEY = 'ledger_v1';
   var VER = 2;
 
+  /* 2026-11-03 扫码恢复：地址带 #imp=<base64紧凑JSON> 时，自动写入本机并清掉 hash。
+     用途 —— 换网址/换设备后把旧账搬回来，不用手动选文件。 */
+  (function(){
+    var m = (location.hash || '').match(/[#&]imp=([A-Za-z0-9_\-=]+)/);
+    if(!m) return;
+    try{
+      var b = m[1].replace(/-/g,'+').replace(/_/g,'/');
+      while(b.length % 4) b += '=';
+      var txt = decodeURIComponent(escape(atob(b)));
+      var c = JSON.parse(txt);
+      if(!c || !c.r || !c.r.length) return;
+      var cats = (c.c || []).map(function(x){ return {id:x[0], name:x[1], def:x[2]||0}; });
+      var incats = (c.i || []).map(function(x){ return {id:x[0], name:x[1], def:x[2]||0}; });
+      var recs = (c.r || []).map(function(x, i){
+        return {id:'imp'+i, t:x[0], cat:x[1], name:x[2], amt:x[3], note:x[4], kind:x[5]||'out'};
+      });
+      localStorage.setItem(KEY, JSON.stringify({v:2, cats:cats, recs:recs, incats:incats}));
+      history.replaceState(null, '', location.pathname);
+      setTimeout(function(){
+        try{ toast('已恢复 '+recs.length+' 笔记录'); }catch(e){}
+      }, 400);
+    }catch(e){}
+  })();
+
   // 补记：null = 记今天；'YYYY-MM-DD' = 这一笔记给那一天
   var BACK = null;
 
