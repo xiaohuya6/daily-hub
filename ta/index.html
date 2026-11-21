@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="theme-color" content="#2563eb">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="小胡三件事">
+<title>小胡的三件事</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#f1f5f9;--card:#fff;--line:#e2e8f0;--txt:#0f172a;--dim:#64748b;
+  --blue:#2563eb;--green:#16a34a;--red:#dc2626;--amber:#d97706;
+}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--txt);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  font-size:16px;-webkit-text-size-adjust:100%}
+body{padding-bottom:82px;max-width:640px;margin:0 auto;
+  padding-top:env(safe-area-inset-top)}
+header{position:sticky;top:0;z-index:20;background:var(--blue);color:#fff;
+  padding:13px 16px;display:flex;align-items:center;justify-content:space-between;
+  box-shadow:0 2px 8px rgba(0,0,0,.08)}
+header h1{font-size:17px;margin:0;font-weight:600;letter-spacing:.5px}
+header .sub{font-size:12px;opacity:.85;margin-top:1px}
+header .dt{font-size:12px;opacity:.9;text-align:right;line-height:1.4}
+main{padding:12px 12px 0}
+.card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px;
+  box-shadow:0 1px 3px rgba(15,23,42,.06)}
+.card h2{font-size:13px;margin:0 0 10px;color:var(--dim);font-weight:600;letter-spacing:.5px;
+  display:flex;justify-content:space-between;align-items:center}
+.card h2 em{font-style:normal;color:#cbd5e1;font-size:11px;font-weight:400}
+.item{display:flex;align-items:flex-start;gap:12px;padding:12px 4px;border-bottom:1px solid var(--line);
+  cursor:pointer}
+.item:last-child{border-bottom:none}
+.box{flex:0 0 26px;width:26px;height:26px;border:2px solid #cbd5e1;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;font-size:15px;color:#fff;
+  margin-top:1px;transition:.15s}
+.box.on{background:var(--green);border-color:var(--green)}
+.item .t{flex:1;min-width:0;line-height:1.45}
+.item .t b{font-weight:500;display:block;word-break:break-word}
+.item .t small{color:var(--dim);font-size:12.5px;display:block;margin-top:1px}
+.item.done .t b{text-decoration:line-through;color:#94a3b8}
+.item.rest .t b{color:#94a3b8}
+.tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:99px;
+  background:#eff6ff;color:var(--blue);margin-left:6px;vertical-align:1px;font-weight:400}
+.tag.warn{background:#fef3c7;color:var(--amber)}
+.tag.me{background:#dcfce7;color:#15803d}
+.prog{height:6px;border-radius:99px;background:#e2e8f0;overflow:hidden;margin:6px 0 12px}
+.prog i{display:block;height:100%;background:var(--green);width:0;transition:.25s}
+.tabs{position:fixed;bottom:0;left:0;right:0;z-index:30;display:grid;
+  grid-template-columns:repeat(4,1fr);
+  background:#fff;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);
+  max-width:640px;margin:0 auto}
+.tabs a{text-align:center;padding:10px 0 12px;font-size:11px;color:var(--dim);
+  text-decoration:none;line-height:1.5}
+.tabs a.on{color:var(--blue);font-weight:600}
+.tabs a span{display:block;font-size:19px;line-height:1.1}
+input,select,textarea{font:inherit;color:inherit;background:#f8fafc;border:1px solid var(--line);
+  border-radius:10px;padding:12px;width:100%;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--blue);background:#fff}
+.row{display:flex;gap:8px;margin-bottom:9px}
+.row>*{flex:1;min-width:0}
+.btn{border:none;border-radius:11px;padding:13px 16px;font:inherit;font-weight:600;
+  background:var(--blue);color:#fff;width:100%;cursor:pointer}
+.btn:active{opacity:.85}
+.btn.gray{background:#e2e8f0;color:#0f172a}
+.btn.green{background:var(--green)}
+.btn.sm{padding:9px 14px;width:auto;font-size:14px;border-radius:9px}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 10px}
+.chip{font-size:13px;padding:7px 12px;border-radius:99px;background:#f1f5f9;
+  border:1px solid var(--line);color:#475569;cursor:pointer;white-space:nowrap}
+.chip:active{background:#e2e8f0}
+.chip.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.money-row{display:flex;align-items:flex-start;gap:10px;padding:11px 2px;border-bottom:1px solid var(--line)}
+.money-row:last-child{border-bottom:none}
+.money-row .amt{font-variant-numeric:tabular-nums;font-weight:600;min-width:76px;text-align:right;
+  padding-top:1px}
+.money-row .info{flex:1;min-width:0;line-height:1.4}
+.money-row .info b{font-weight:500;font-size:15px;display:block;word-break:break-word}
+.money-row .info small{color:var(--dim);font-size:12.5px;display:block;margin-top:1px}
+.money-row .del{color:#cbd5e1;font-size:20px;padding:0 2px 0 6px;cursor:pointer;line-height:1}
+.daybar{background:#f8fafc;margin:10px -14px 4px;padding:7px 14px;font-size:12px;
+  color:var(--dim);display:flex;justify-content:space-between;border-top:1px solid var(--line);
+  border-bottom:1px solid var(--line)}
+.daybar:first-child{margin-top:0;border-top:none}
+.sum{display:flex;gap:9px}
+.sum div{flex:1;background:#f8fafc;border-radius:11px;padding:11px 6px;text-align:center}
+.sum b{display:block;font-size:19px;font-variant-numeric:tabular-nums;margin-bottom:2px}
+.sum small{color:var(--dim);font-size:11.5px}
+.hint{color:var(--dim);font-size:12.5px;line-height:1.65;margin:9px 2px 0}
+pre.out{background:#0f172a;color:#e2e8f0;border-radius:12px;padding:14px;
+  font-size:12.5px;line-height:1.7;white-space:pre-wrap;word-break:break-all;
+  max-height:50vh;overflow:auto;margin:0;font-family:ui-monospace,Menlo,Consolas,monospace}
+.toast{position:fixed;left:50%;bottom:100px;transform:translateX(-50%) translateY(10px);
+  background:#0f172a;color:#fff;padding:10px 18px;border-radius:99px;font-size:13.5px;
+  opacity:0;pointer-events:none;transition:.22s;z-index:99;white-space:nowrap}
+.toast.on{opacity:.95;transform:translateX(-50%) translateY(0)}
+.empty{color:#94a3b8;text-align:center;padding:24px 0;font-size:14px}
+.seg{display:flex;background:#f1f5f9;border-radius:11px;padding:3px;margin-bottom:10px}
+.seg button{flex:1;border:none;background:transparent;font:inherit;font-size:14px;
+  padding:8px 0;border-radius:9px;color:var(--dim);font-weight:500}
+.seg button.on{background:#fff;color:var(--txt);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1 id="hTitle">今天</h1>
+    <div class="sub" id="hSub">做完就算过完一天</div>
+  </div>
+  <div class="dt" id="hDate"></div>
+</header>
+
+<main>
+  <!-- ============ 今天 ============ -->
+  <section id="p-today">
+    <div class="card">
+      <h2>今日进度</h2>
+      <div style="display:flex;align-items:baseline;gap:8px">
+        <span id="progNum" style="font-size:30px;font-weight:700;font-variant-numeric:tabular-nums">0</span>
+        <span style="color:var(--dim);font-size:14px" id="progAll">/ 0</span>
+      </div>
+      <div class="prog"><i id="progBar"></i></div>
+      <p class="hint" id="progHint">每天就这几件，做完就算过完一天。</p>
+    </div>
+    <div id="todayList"></div>
+  </section>
+
+  <!-- ============ 待办 ============ -->
+  <section id="p-todo" hidden>
+    <div class="card">
+      <h2>记一件事<em>想到就写，别放脑子里</em></h2>
+      <div class="row">
+        <input id="todoIn" placeholder="要做什么…" autocomplete="off" enterkeyhint="done">
+      </div>
+      <button class="btn" id="todoAdd">加进待办</button>
+    </div>
+    <div class="card">
+      <h2>没办的 <em id="todoCnt"></em></h2>
+      <div id="todoList"></div>
+    </div>
+    <div class="card">
+      <h2>办完的</h2>
+      <div id="todoDone"></div>
+    </div>
+  </section>
+
+  <!-- ============ 记账 ============ -->
+  <section id="p-money" hidden>
+    <div class="card">
+      <h2>记一笔 <em>三步：金额 → 买啥 → 谁的</em></h2>
+      <div class="row">
+        <input id="mAmt" type="number" inputmode="decimal" step="0.01" placeholder="金额 ¥">
+        <input id="mWhat" placeholder="买了什么" style="flex:1.7" autocomplete="off">
+      </div>
+      <div class="chips" id="mQuick"></div>
+      <div class="row">
+        <select id="mMine">
+          <option value="1">是我的支出</option>
+          <option value="0">不是我的（点这里）</option>
+        </select>
+      </div>
+      <div id="mOther" style="display:none">
+        <div class="chips" id="mWhoQuick"></div>
+        <div class="row">
+          <input id="mWho" placeholder="是谁的？（妈 / 女朋友 / 哥…）" autocomplete="off">
+        </div>
+        <div class="row">
+          <input id="mWhy" placeholder="干什么用？（代买 / 借 / 垫付…）" autocomplete="off">
+        </div>
+      </div>
+      <button class="btn" id="mAdd">记下来</button>
+    </div>
+    <div class="card">
+      <h2>合计</h2>
+      <div class="seg">
+        <button class="on" data-r="month">本月</button>
+        <button data-r="today">今天</button>
+        <button data-r="all">全部</button>
+      </div>
+      <div class="sum">
+        <div><b id="sMine" style="color:var(--red)">0</b><small>我的支出</small></div>
+        <div><b id="sOther" style="color:var(--dim)">0</b><small>别人的</small></div>
+        <div><b id="sCnt" style="color:var(--dim)">0</b><small>笔数</small></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>明细 <em>新的在上</em></h2>
+      <div id="moneyList"></div>
+    </div>
+  </section>
+
+  <!-- ============ 导出 ============ -->
+  <section id="p-out" hidden>
+    <div class="card">
+      <h2>复制这段发给我</h2>
+      <p class="hint" style="margin-top:0">这段就是今天的实况：清单做没做、待办剩什么、今天花了什么。复制发我，我就知道你卡在哪。</p>
+      <div class="row" style="margin-top:10px">
+        <button class="btn" id="btnCopy">一键复制</button>
+        <button class="btn gray" id="btnTxt" style="flex:0 0 96px">存文件</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>预览</h2>
+      <pre class="out" id="outText"></pre>
+    </div>
+    <div class="card">
+      <h2>装到手机桌面<em>装完就是 3 个图标</em></h2>
+      <p class="hint" style="margin-top:0">
+        <b style="color:var(--txt)">安卓（Chrome / Edge）：</b>打开链接 → 右上角「⋮」→ 添加到主屏幕<br>
+        <b style="color:var(--txt)">苹果（Safari）：</b>打开链接 → 底部「分享」→ 添加到主屏幕<br><br>
+        三个入口，想要哪个图标就装哪个：<br>
+        · 每天清单 → 链接后面加 <code>#today</code><br>
+        · 待办 → 加 <code>#todo</code><br>
+        · 记账 → 加 <code>#money</code><br><br>
+        <span style="color:var(--amber)">别在微信里点开就用</span> —— 微信会清缓存，记的东西会没。要装到桌面用系统浏览器打开。
+      </p>
+    </div>
+    <div class="card">
+      <h2>备份 / 恢复<em>换手机、清缓存前先备份</em></h2>
+      <div class="row" style="margin-top:2px">
+        <button class="btn gray sm" id="btnBak" style="width:100%">备份（复制这段存起来）</button>
+      </div>
+      <div class="row">
+        <input id="restoreIn" placeholder="把备份的那段粘回这里">
+      </div>
+      <div class="row">
+        <button class="btn gray sm" id="btnRestore" style="width:100%">恢复</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<nav class="tabs">
+  <a href="#today" data-p="today"><span>✓</span>今天</a>
+  <a href="#todo" data-p="todo"><span>☰</span>待办</a>
+  <a href="#money" data-p="money"><span>¥</span>记账</a>
+  <a href="#out" data-p="out"><span>↑</span>导出</a>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =====================================================================
+   小胡的三件事  v2
+   三个入口：index.html#today / #todo / #money  （可分别加到手机桌面）
+   数据全部在手机本地（localStorage），不上传，不用登录
+   ===================================================================== */
+
+var K = 'bxd_v2';
+var SEED_VER = 3;          /* 我改这个数字 → 他刷新页面就收到新待办 */
+
+/* ================= 存储 ================= */
+function load(){
+  var d;
+  try{ d = JSON.parse(localStorage.getItem(K)||'{}'); }catch(e){ d = {}; }
+  d.today = d.today || {};   /* {'2026-11-21': {'0':1,'3':1}} */
+  d.todo  = d.todo  || [];   /* [{id,txt,at,done,sk}] */
+  d.money = d.money || [];   /* [{id,amt,what,mine,who,why,at}] */
+  d.seedVer = d.seedVer || 0;
+  d.seq = d.seq || 0;
+  return d;
+}
+function save(){ try{ localStorage.setItem(K, JSON.stringify(DB)); }catch(e){ toast('存不下了，去清点旧账'); } }
+var DB = load();
+
+/* ================= 时间（全用本地时间，避免 UTC 串天） ================= */
+function p2(n){ return ('0'+n).slice(-2); }
+function ymd(d){ d=d||new Date(); return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate()); }
+function hm(d){ d=d||new Date(); return p2(d.getHours())+':'+p2(d.getMinutes()); }
+function stamp(){ var n=new Date(); return ymd(n)+' '+hm(n); }
+var NOW=new Date(), TODAY=ymd(NOW), DOW=NOW.getDay(), DOM=NOW.getDate();
+var MONTH=TODAY.slice(0,7);
+var WD=['周日','周一','周二','周三','周四','周五','周六'];
+var isWeekend=(DOW===0||DOW===6);
+
+/* ================= 我推给他的待办（由我改） ================= */
+/* sk = 稳定 key，用来去重；改了 SEED_VER 只增量加，不重复加 */
+var SEEDS = [
+  {sk:'hd-wx',  txt:'货代客户微信怎么开口（先问同事要话术）'},
+  {sk:'hd-hb',  txt:'货代怎么"混上班"（摸清几点必须在、几点可以走）'},
+  {sk:'cx-shen',txt:'车险深水区：异地车 / 脱保 / 营运车为什么出不了单'},
+  {sk:'money',  txt:'记账：每天睡前记 3 笔（早中晚各看一眼支付宝微信）'},
+  {sk:'pagefile',txt:'把 pagefile.sys 那 33G 挪到 D 盘（设置里改，改完要重启）'},
+  {sk:'backup', txt:'daily-hub-backup 备份还是红的，回头一起修'}
+];
+
+/* ================= 每日清单模板 ================= */
+function tasks(){
+  var list=[
+    {g:'上午', n:'吃维生素（第 1 次）', d:'早饭后，别空腹'},
+    {g:'上午', n:'车险：加业务员', d:'加到微信弹「添加过于频繁」就停，弹了就收工'},
+    {g:'上午', n:'车险：报价', d:'业务员发消息，看到就报', soft:'有就报'},
+    {g:'上午', n:'车险：打字', d:'有人聊就聊，约 5 分钟', soft:'有人找才做'},
+    {g:'上午', n:'货代：加 2 个客户', d:'加不到不算失败，电话打了就算做了', wk:1},
+    {g:'上午', n:'货代：打字 5 分钟', d:'回客户消息', wk:1, soft:'有人找才做'},
+    {g:'下午', n:'车险：加人 / 报价', d:'业务员白天在线，这是主力时段'},
+    {g:'下午', n:'货代：补 2 个客户', d:'上午没加够就在这补', wk:1, soft:'上午够了就跳过'},
+    {g:'晚上', n:'三角洲：收菜', d:'10–20 分钟，可挂机'},
+    {g:'晚上', n:'吃维生素（第 2 次）', d:'晚饭后'},
+    {g:'晚上', n:'给爸发一条消息', d:'一句就行，别攒着'},
+    {g:'晚上', n:'21:30 接她', d:'出门前看下手机电量'}
+  ];
+  var extra=[];
+  if(DOW===1) extra.push({g:'今天额外', n:'发一条朋友圈', d:'「第 X 天。还在加人，还在跑单。有单随时发我。」只改数字'});
+  if(DOW===2) extra.push({g:'今天额外', n:'群发一次（纯文字）', d:'群发不能发图'});
+  if(DOW===0) extra.push({g:'今天额外', n:'记三个数', d:'本周加了几个 / 几个回话 / 几个询价'});
+  if(DOM===20) extra.push({g:'今天额外', n:'工资到账 → 记到账里', d:'还了多少、剩多少'});
+  return extra.concat(list);
+}
+
+/* ================= 渲染：今天 ================= */
+function renderToday(){
+  var box=document.getElementById('todayList');
+  var ts=tasks();
+  if(!DB.today[TODAY]) DB.today[TODAY]={};
+  var done=DB.today[TODAY];
+
+  var groups={},order=[];
+  ts.forEach(function(t,i){
+    t.idx=i;
+    if(!groups[t.g]){ groups[t.g]=[]; order.push(t.g); }
+    groups[t.g].push(t);
+  });
+
+  var html='';
+  order.forEach(function(g){
+    var arr=groups[g];
+    var on=arr.filter(function(t){ return done[t.idx]; }).length;
+    html+='<div class="card"><h2>'+g+' <em>'+on+'/'+arr.length+'</em></h2>';
+    arr.forEach(function(t){
+      var rest=(isWeekend && t.wk);
+      var checked=!!done[t.idx];
+      html+='<div class="item'+(checked?' done':'')+(rest?' rest':'')+'" data-i="'+t.idx+'">'
+        + '<div class="box'+(checked?' on':'')+'">'+(checked?'✓':'')+'</div>'
+        + '<div class="t"><b>'+t.n
+        + (rest?'<span class="tag warn">周末可不做</span>':'')
+        + (t.soft&&!rest?'<span class="tag">'+t.soft+'</span>':'')
+        + '</b>'+(t.d?'<small>'+t.d+'</small>':'')+'</div></div>';
+    });
+    html+='</div>';
+  });
+  box.innerHTML=html;
+
+  var all=ts.length;
+  var got=0;
+  for(var i=0;i<all;i++){ if(done[i]) got++; }
+  document.getElementById('progNum').textContent=got;
+  document.getElementById('progAll').textContent='/ '+all;
+  document.getElementById('progBar').style.width=(all? got/all*100 : 0)+'%';
+
+  var hint='每天就这几件，做完就算过完一天。';
+  if(all&&got>=all) hint='全做完了。今天就到这，别加码。';
+  else if(got===0) hint=isWeekend? '周末，业务员也休息。先把维生素和给爸的消息做了就行。' : '从最简单的那个开始，不用按顺序。';
+  else if(got>=all*0.6) hint='过半了，剩的挑一个做掉就收工。';
+  document.getElementById('progHint').textContent=hint;
+}
+
+document.getElementById('p-today').addEventListener('click',function(e){
+  var it=e.target.closest('.item'); if(!it) return;
+  var i=it.getAttribute('data-i');
+  var d=DB.today[TODAY]||(DB.today[TODAY]={});
+  d[i] = d[i]? 0 : 1;
+  save(); renderToday();
+});
+
+/* ================= 渲染：待办 ================= */
+function renderTodo(){
+  var open=DB.todo.filter(function(x){ return !x.done; });
+  var closed=DB.todo.filter(function(x){ return x.done; }).slice(-15).reverse();
+
+  document.getElementById('todoCnt').textContent = open.length? open.length+' 条' : '';
+
+  var h1 = open.length ? open.map(function(x){
+    return '<div class="item" data-t="'+x.id+'"><div class="box"></div>'
+      + '<div class="t"><b>'+esc(x.txt)+'</b><small>'
+      + (x.at||'').slice(5) + (x.sk?' · <span style="color:#15803d">我记的</span>':'')
+      + '</small></div></div>';
+  }).join('') : '<div class="empty">没有没办的事。想干什么直接写上面。</div>';
+
+  var h2 = closed.length ? closed.map(function(x){
+    return '<div class="item done" data-t="'+x.id+'"><div class="box on">✓</div>'
+      + '<div class="t"><b>'+esc(x.txt)+'</b></div></div>';
+  }).join('') : '<div class="empty">—</div>';
+
+  document.getElementById('todoList').innerHTML=h1;
+  document.getElementById('todoDone').innerHTML=h2;
+}
+
+document.getElementById('todoAdd').onclick=function(){
+  var el=document.getElementById('todoIn');
+  var v=el.value.trim();
+  if(!v){ toast('先写点什么'); return; }
+  DB.todo.push({id:'t'+Date.now()+Math.floor(Math.random()*99), txt:v, at:stamp(), done:0});
+  el.value=''; save(); renderTodo(); toast('记下了');
+};
+document.getElementById('todoIn').addEventListener('keydown',function(e){
+  if(e.key==='Enter'){ e.preventDefault(); document.getElementById('todoAdd').click(); }
+});
+document.getElementById('p-todo').addEventListener('click',function(e){
+  var it=e.target.closest('.item'); if(!it) return;
+  var id=it.getAttribute('data-t');
+  DB.todo.forEach(function(x){ if(x.id===id) x.done = x.done? 0 : 1; });
+  save(); renderTodo();
+});
+
+/* ================= 渲染：记账 ================= */
+var MONEY_RANGE='month';
+
+var QUICK=['吃饭','买菜日用','交通','烟','游戏'];
+var WHO_QUICK=['妈','女朋友','哥','同事'];
+
+(function(){
+  document.getElementById('mQuick').innerHTML = QUICK.map(function(q){
+    return '<div class="chip" data-q="'+q+'">'+q+'</div>';
+  }).join('');
+  document.getElementById('mWhoQuick').innerHTML = WHO_QUICK.map(function(q){
+    return '<div class="chip" data-w="'+q+'">'+q+'</div>';
+  }).join('');
+  document.getElementById('mQuick').addEventListener('click',function(e){
+    var c=e.target.closest('.chip'); if(!c) return;
+    document.getElementById('mWhat').value=c.getAttribute('data-q');
+    document.getElementById('mAmt').focus();
+  });
+  document.getElementById('mWhoQuick').addEventListener('click',function(e){
+    var c=e.target.closest('.chip'); if(!c) return;
+    document.getElementById('mWho').value=c.getAttribute('data-w');
+  });
+})();
+
+document.getElementById('mMine').onchange=function(){
+  document.getElementById('mOther').style.display = (this.value==='0')? 'block':'none';
+};
+
+function moneyInRange(x){
+  if(MONEY_RANGE==='today') return x.at.slice(0,10)===TODAY;
+  if(MONEY_RANGE==='month') return x.at.slice(0,7)===MONTH;
+  return true;
+}
+
+function renderMoney(){
+  /* 排序：先按时间倒序；同一分钟内按录入序号倒序（后记的在上） */
+  var all=DB.money.slice().sort(function(a,b){
+    if(a.at!==b.at) return a.at<b.at? 1:-1;
+    return (b.n||0)-(a.n||0);
+  });
+  var m=all.filter(moneyInRange);
+
+  var mine=0,other=0;
+  m.forEach(function(x){ if(x.mine) mine+=x.amt; else other+=x.amt; });
+  document.getElementById('sMine').textContent=mine.toFixed(1);
+  document.getElementById('sOther').textContent=other.toFixed(1);
+  document.getElementById('sCnt').textContent=m.length;
+
+  if(!m.length){
+    document.getElementById('moneyList').innerHTML='<div class="empty">这里还没记过</div>';
+    return;
+  }
+
+  /* 按天分组 */
+  var days={},ord=[];
+  m.forEach(function(x){
+    var d=x.at.slice(0,10);
+    if(!days[d]){ days[d]={list:[],mine:0,other:0}; ord.push(d); }
+    days[d].list.push(x);
+    if(x.mine) days[d].mine+=x.amt; else days[d].other+=x.amt;
+  });
+
+  var html='';
+  ord.forEach(function(d){
+    var o=days[d];
+    var lab = d===TODAY? '今天' : d.slice(5).replace('-','/');
+    html+='<div class="daybar"><span>'+lab+' · '+WD[new Date(d+'T00:00:00').getDay()]+'</span>'
+      + '<span>我的 '+o.mine.toFixed(1)+(o.other? ' ｜ 别的 '+o.other.toFixed(1):'')+'</span></div>';
+
+    o.list.forEach(function(x){
+      html+='<div class="money-row" data-m="'+x.id+'">'
+        + '<div class="amt" style="color:'+(x.mine?'var(--red)':'var(--dim)')+'">'
+        + (x.mine?'':'')+x.amt.toFixed(2)+'</div>'
+        + '<div class="info"><b>'+esc(x.what||'—')+'</b><small>'
+        + (x.mine? '我的支出'
+                : '<span style="color:#d97706">不是我的 · '+esc(x.who||'别人')+' · '+esc(x.why||'未写用途')+'</span>')
+        + ' · '+x.at.slice(11)+'</small></div>'
+        + '<div class="del">×</div></div>';
+    });
+  });
+  document.getElementById('moneyList').innerHTML=html;
+}
+
+document.querySelector('.seg').addEventListener('click',function(e){
+  var b=e.target.closest('button'); if(!b) return;
+  MONEY_RANGE=b.getAttribute('data-r');
+  this.querySelectorAll('button').forEach(function(x){ x.classList.toggle('on', x===b); });
+  renderMoney();
+});
+
+document.getElementById('mAdd').onclick=function(){
+  var a=parseFloat(document.getElementById('mAmt').value);
+  if(!a || a<=0){ toast('金额填一下'); document.getElementById('mAmt').focus(); return; }
+  var mine=document.getElementById('mMine').value==='1';
+  DB.seq=(DB.seq||0)+1;
+  DB.money.push({
+    id:'m'+Date.now()+Math.floor(Math.random()*99),
+    n:DB.seq,
+    amt:a,
+    what:document.getElementById('mWhat').value.trim(),
+    mine:mine? 1:0,
+    who:mine? '':document.getElementById('mWho').value.trim(),
+    why:mine? '':document.getElementById('mWhy').value.trim(),
+    at:stamp()
+  });
+  document.getElementById('mAmt').value='';
+  document.getElementById('mWhat').value='';
+  document.getElementById('mWho').value='';
+  document.getElementById('mWhy').value='';
+  save(); renderMoney(); toast('记下了 ¥'+a.toFixed(2));
+  document.getElementById('mAmt').focus();
+};
+
+document.getElementById('p-money').addEventListener('click',function(e){
+  if(!e.target.classList.contains('del')) return;
+  var row=e.target.closest('.money-row');
+  var id=row.getAttribute('data-m');
+  if(!confirm('删掉这一笔？')) return;
+  DB.money=DB.money.filter(function(x){ return x.id!==id; });
+  save(); renderMoney();
+});
+
+/* ================= 导出 ================= */
+function buildOut(){
+  var L=[];
+  L.push('【小胡日报】'+TODAY+' '+WD[DOW]);
+
+  var ts=tasks(), done=DB.today[TODAY]||{};
+  var got=0, miss=[];
+  ts.forEach(function(t,i){
+    if(done[i]) got++; else miss.push(t.n);
+  });
+  L.push('清单 '+got+'/'+ts.length);
+  if(miss.length) L.push('没做：'+miss.join('、'));
+  else L.push('全做完了');
+
+  var open=DB.todo.filter(function(x){ return !x.done; });
+  if(open.length) L.push('待办还剩 '+open.length+' 条：'+open.map(function(x){ return x.txt; }).join('；'));
+
+  var td=DB.money.filter(function(x){ return x.at.slice(0,10)===TODAY; });
+  if(td.length){
+    var s=0, o=0;
+    td.forEach(function(x){
+      if(x.mine) s+=x.amt; else o+=x.amt;
+      L.push('花 '+x.amt.toFixed(2)+' '+(x.what||'(没写)')
+        + (x.mine? '（我的）' : '（不是我的·'+(x.who||'别人')+'·'+(x.why||'')+'）'));
+    });
+    L.push('今天我的支出合计：¥'+s.toFixed(2));
+    if(o>0) L.push('（另有 ¥'+o.toFixed(2)+' 是我代付/垫的，不算我的）');
+  }else{
+    L.push('今天没记账');
+  }
+  return L.join('\n');
+}
+function renderOut(){ document.getElementById('outText').textContent=buildOut(); }
+
+document.getElementById('btnCopy').onclick=function(){
+  var t=buildOut();
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(t).then(function(){ toast('复制好了，去粘给我'); },
+      function(){ fallbackCopy(t); });
+  }else fallbackCopy(t);
+};
+function fallbackCopy(t){
+  var ta=document.createElement('textarea');
+  ta.value=t; ta.style.position='fixed'; ta.style.left='-9999px'; ta.style.top='0';
+  document.body.appendChild(ta);
+  ta.focus(); ta.select();
+  try{ document.execCommand('copy'); toast('复制好了，去粘给我'); }
+  catch(e){ toast('长按下面的字手动复制'); }
+  document.body.removeChild(ta);
+}
+document.getElementById('btnTxt').onclick=function(){
+  var blob=new Blob([buildOut()],{type:'text/plain;charset=utf-8'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='日报-'+TODAY+'.txt';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  toast('存好了');
+};
+
+/* ================= 备份 / 恢复 ================= */
+document.getElementById('btnBak').onclick=function(){
+  var s=JSON.stringify(DB);
+  fallbackCopy(s);
+  document.getElementById('restoreIn').value=s;
+  toast('备份好了，粘到微信收藏里存着');
+};
+document.getElementById('btnRestore').onclick=function(){
+  var v=document.getElementById('restoreIn').value.trim();
+  if(!v){ toast('先粘备份内容'); return; }
+  var d;
+  try{ d=JSON.parse(v); }catch(e){ toast('这段不是备份内容，检查一下'); return; }
+  if(!d || typeof d!=='object' || (!d.todo && !d.money && !d.today)){
+    toast('这段不是备份内容，检查一下'); return;
+  }
+  if(!confirm('会用备份覆盖现在的数据，确定？')) return;
+  try{
+    localStorage.setItem(K, JSON.stringify(d));
+    DB=load();
+    document.getElementById('restoreIn').value='';
+    renderAll(); toast('恢复了');
+  }catch(e){ toast('恢复失败，可能空间不够'); }
+};
+
+/* ================= Tab 切换 ================= */
+var PAGES={today:'今天', todo:'待办', money:'记账', out:'导出'};
+var SUBS={today:'做完就算过完一天', todo:'想一件事，写一行', money:'我的 / 不是我的，分开算', out:'复制发我'};
+
+function go(p, push){
+  if(!PAGES[p]) p='today';
+  ['today','todo','money','out'].forEach(function(k){
+    document.getElementById('p-'+k).hidden = (k!==p);
+  });
+  document.querySelectorAll('.tabs a').forEach(function(x){
+    x.classList.toggle('on', x.getAttribute('data-p')===p);
+  });
+  document.getElementById('hTitle').textContent=PAGES[p];
+  document.getElementById('hSub').textContent=SUBS[p];
+  if(p==='out') renderOut();
+  if(push && location.hash!=='#'+p){
+    try{ history.replaceState(null,'','#'+p); }catch(e){}
+  }
+  window.scrollTo(0,0);
+}
+
+document.querySelector('.tabs').addEventListener('click',function(e){
+  var a=e.target.closest('a'); if(!a) return;
+  e.preventDefault();
+  go(a.getAttribute('data-p'), true);
+});
+window.addEventListener('hashchange',function(){
+  go((location.hash||'#today').slice(1), false);
+});
+
+/* ================= 工具 ================= */
+function esc(s){
+  return String(s==null?'':s).replace(/[&<>"]/g,function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];
+  });
+}
+var tt;
+function toast(m){
+  var el=document.getElementById('toast');
+  el.textContent=m; el.classList.add('on');
+  clearTimeout(tt);
+  tt=setTimeout(function(){ el.classList.remove('on'); }, 1700);
+}
+
+/* ================= 合并我推的待办 ================= */
+function mergeSeeds(){
+  if(DB.seedVer>=SEED_VER) return;
+  var have={};
+  DB.todo.forEach(function(x){ if(x.sk) have[x.sk]=1; });
+  var added=0;
+  SEEDS.forEach(function(s){
+    if(have[s.sk]) return;
+    DB.todo.push({ id:'s'+s.sk+'-'+Date.now(), txt:s.txt, at:stamp(), done:0, sk:s.sk });
+    added++;
+  });
+  DB.seedVer=SEED_VER;
+  save();
+  if(added) setTimeout(function(){ toast('我加了 '+added+' 条待办'); }, 600);
+}
+
+/* ================= 启动 ================= */
+function renderAll(){ renderToday(); renderTodo(); renderMoney(); }
+
+(function init(){
+  var n=new Date();
+  document.getElementById('hDate').innerHTML=
+    WD[DOW]+'<br>'+(n.getMonth()+1)+'/'+DOM;
+  mergeSeeds();
+  renderAll();
+  go((location.hash||'#today').slice(1), false);
+})();
+</script>
+</body>
+</html>
