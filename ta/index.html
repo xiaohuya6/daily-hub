@@ -208,7 +208,7 @@ pre.out{background:#0f172a;color:#e2e8f0;border-radius:12px;padding:14px;
       <h2>预览</h2>
       <pre class="out" id="outText"></pre>
     </div>
-    <div class="card">
+    <div class="card" id="installCard">
       <h2>装到手机桌面<em>装完就是 3 个图标</em></h2>
       <p class="hint" style="margin-top:0">
         <b style="color:var(--txt)">安卓（Chrome / Edge）：</b>打开链接 → 右上角「⋮」→ 添加到主屏幕<br>
@@ -680,6 +680,11 @@ function renderAll(){ renderToday(); renderTodo(); renderMoney(); }
   var n=new Date();
   document.getElementById('hDate').innerHTML=
     WD[DOW]+'<br>'+(n.getMonth()+1)+'/'+DOM;
+  /* 装成 App 之后（file:// 协议）就不需要「装到桌面」那张卡了 */
+  if(location.protocol==='file:'){
+    var ic=document.getElementById('installCard');
+    if(ic) ic.style.display='none';
+  }
   mergeSeeds();
   renderAll();
   go((location.hash||'#today').slice(1), false);
