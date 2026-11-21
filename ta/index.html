@@ -133,9 +133,9 @@ pre.out{background:#0f172a;color:#e2e8f0;border-radius:12px;padding:14px;
   <!-- ============ 待办 ============ -->
   <section id="p-todo" hidden>
     <div class="card">
-      <h2>记一件事<em>想到就写，别放脑子里</em></h2>
+      <h2>想到什么就写这<em>想法、要做的事，都写，别放脑子里</em></h2>
       <div class="row">
-        <input id="todoIn" placeholder="要做什么…" autocomplete="off" enterkeyhint="done">
+        <input id="todoIn" placeholder="想到什么 / 要做什么，写一行…" autocomplete="off" enterkeyhint="done">
       </div>
       <button class="btn" id="todoAdd">加进待办</button>
     </div>
@@ -303,7 +303,9 @@ function tasks(){
     {g:'晚上', n:'三角洲：收菜', d:'10–20 分钟，可挂机'},
     {g:'晚上', n:'吃维生素（第 2 次）', d:'晚饭后'},
     {g:'晚上', n:'给爸发一条消息', d:'一句就行，别攒着'},
-    {g:'晚上', n:'21:30 接她', d:'出门前看下手机电量'}
+    {g:'晚上', n:'21:30 接她', d:'出门前看下手机电量'},
+    {g:'晚上', n:'总结今天 → 发我', d:'点下面「导出」→ 一键复制 → 发我。30 秒，不用写'},
+    {g:'晚上', n:'想到的事补记一行', d:'想法不写就烂脑子里了，写待办那页就行', soft:'没想到就跳过'}
   ];
   var extra=[];
   if(DOW===1) extra.push({g:'今天额外', n:'发一条朋友圈', d:'「第 X 天。还在加人，还在跑单。有单随时发我。」只改数字'});
