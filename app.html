@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#F1F3EE" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14161C" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="今日工作台">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>今日工作台</title>
+<style>
+/* ══════════════════════════════════════════════════════════════
+   今日工作台 · 手机 App 版（2026-11-22）
+   他要的原话（三句连着的）：
+     「我不要网页版的，我只要 APP 版的手机上的」
+     「我喜欢那种二次元恋爱风的那种感觉」「男女主都要的哦」
+     「类似于这两张图片的」→ 90 年代赛璐璐 · 男女主侧脸对望 · 逆光 · 深蓝校服
+   所以：顶部是一张电影感的双人主视觉（他给的参考图那种质感），
+   下面是安静的白卡清单 —— 上班偷瞄不刺眼，抬眼看一眼心情会好一点。
+   数据与电脑版同一套 localStorage 键名，云端加密备份共用一份。
+   ══════════════════════════════════════════════════════════════ */
+:root{
+  --ground:#F1F3EE;
+  --surface:#FFFFFF;
+  --ink:#1F2A36;
+  --ink2:#54606E;
+  --ink3:#68717D;
+  --line:#DFE3DB;
+  --rose:#B85C79;        /* 唯一的数据色：进度、勾选、金额、主按钮 */
+  --rose-soft:#F3E2E7;
+  --navy:#2E3B5C;        /* 取自校服的深蓝，只用在页签选中与标题 */
+  --tap:46px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ground:#14161C; --surface:#1B1E26; --ink:#EDE9E4; --ink2:#A2A7B2;
+    --ink3:#6E747F; --line:#282C35; --rose:#E39BAF; --rose-soft:#3A2830; --navy:#C9D2E6;
+  }
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+button,input{font-family:inherit}
+html,body{margin:0;padding:0}
+body{
+  background:var(--ground);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","HarmonyOS Sans SC","Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;
+  font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased;
+  padding-bottom:calc(74px + env(safe-area-inset-bottom));
+}
+.wrap{max-width:560px;margin:0 auto;padding:0 16px}
+.num{font-variant-numeric:tabular-nums}
+
+/* ── 主视觉 ── */
+.hero{position:relative;height:min(46vh,320px);min-height:210px;overflow:hidden;background:#20242E}
+.hero img{width:100%;height:100%;object-fit:cover;object-position:50% 32%;display:block}
+.hero::after{                       /* 压在照片上的那层纱，只为让字读得清 */
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(to bottom,rgba(16,22,26,.34) 0%,rgba(16,22,26,0) 30%,rgba(16,22,26,.30) 66%,rgba(16,22,26,.62) 84%,var(--ground) 100%);
+}
+.hero-txt{
+  position:absolute;left:0;right:0;bottom:34px;z-index:2;
+  max-width:560px;margin:0 auto;padding:0 20px;color:#FFF;
+}
+.hero-txt .d{font-size:12.5px;letter-spacing:.14em;opacity:.82}
+.hero-txt h1{margin:4px 0 0;font-size:27px;font-weight:600;letter-spacing:.02em}
+.hero-txt .s{margin:5px 0 0;font-size:13.5px;opacity:.9}
+
+/* ── 对话框（她说话，压在主视觉下沿）── */
+.talk{
+  position:relative;z-index:3;margin:-26px auto 0;max-width:560px;
+  display:flex;gap:11px;align-items:flex-start;
+  background:var(--surface);border:1px solid var(--line);border-radius:20px;
+  padding:13px 15px;
+}
+.talk img{width:40px;height:40px;border-radius:50%;flex:0 0 40px;object-fit:cover;object-position:50% 30%}
+.talk p{margin:0;font-size:14.5px;line-height:1.55;color:var(--ink2)}
+.talk b{color:var(--ink);font-weight:600}
+
+/* ── 进度条 = 今天的好感度 ── */
+.bar{height:3px;background:var(--line);border-radius:3px;margin:14px 0 0;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--rose);border-radius:3px;transition:width .35s ease}
+
+/* ── 卡片与行 ── */
+.block{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:6px 16px 10px;margin:14px 0 0}
+.blockhd{display:flex;align-items:baseline;justify-content:space-between;padding:11px 0 6px;font-size:13px;color:var(--ink3)}
+.blockhd .v{font-variant-numeric:tabular-nums}
+.list{list-style:none;margin:0;padding:0}
+.row{display:flex;align-items:flex-start;gap:12px;min-height:var(--tap);padding:12px 0;border-top:1px solid var(--line)}
+.row:first-child{border-top:none}
+.tick{flex:0 0 23px;width:23px;height:23px;margin-top:1px;border:1.5px solid var(--ink3);border-radius:50%;background:transparent;cursor:pointer;position:relative;padding:0}
+.row.done .tick{background:var(--rose);border-color:var(--rose)}
+.row.done .tick::after{content:"";position:absolute;left:7px;top:3px;width:5px;height:10px;border-right:2px solid #fff;border-bottom:2px solid #fff;transform:rotate(40deg)}
+.body{flex:1;font-size:16px;line-height:1.5;word-break:break-word}
+.row.done .body{color:var(--ink3);text-decoration:line-through;text-decoration-thickness:1px}
+.amt{font-variant-numeric:tabular-nums;font-size:15.5px;white-space:nowrap;color:var(--ink)}
+.erase{border:none;background:none;color:var(--ink3);font-size:13px;padding:6px 0 6px 8px;cursor:pointer}
+.empty{color:var(--ink3);font-size:14px;padding:14px 0 16px}
+
+/* ── 喝水：五颗心 ── */
+.hearts{display:flex;gap:6px;padding:4px 0 8px}
+.heart{
+  width:46px;height:46px;border:none;background:none;cursor:pointer;padding:0;
+  transition:transform .12s ease
+}
+.heart svg{width:26px;height:26px;display:block;margin:0 auto}
+.heart svg path{fill:none;stroke:var(--ink3);stroke-width:1.4}
+.heart.on svg path{fill:var(--rose);stroke:var(--rose)}
+.heart:active{transform:scale(.88)}
+
+/* ── 记一笔 ── */
+.form{display:flex;gap:8px;padding:2px 0 10px}
+.form input{
+  height:var(--tap);border:1px solid var(--line);border-radius:14px;background:transparent;
+  color:var(--ink);font-size:16px;padding:0 13px;font-family:inherit;min-width:0
+}
+.form input::placeholder{color:var(--ink3)}
+#amt{flex:0 0 92px;text-align:right;font-variant-numeric:tabular-nums}
+#note,#backNew,#ideaNew{flex:1}
+.btn{height:var(--tap);min-width:var(--tap);padding:0 17px;border:none;border-radius:14px;background:var(--rose);color:#FFF;font-size:15px;font-family:inherit;cursor:pointer}
+.btn:active{opacity:.82}
+.btn.ghost{background:transparent;color:var(--ink2);border:1px solid var(--line)}
+
+/* ── 底部页签 ── */
+nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+.tabs{max-width:560px;margin:0 auto;display:flex}
+.tab{flex:1;border:none;background:none;font-family:inherit;font-size:13px;color:var(--ink3);height:62px;cursor:pointer;padding:0;position:relative}
+.tab.on{color:var(--navy);font-weight:600}
+.tab.on::after{content:"";position:absolute;left:50%;bottom:11px;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:var(--rose)}
+.tab:active{opacity:.6}
+
+/* ── 更多页 ── */
+.item{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:var(--tap);padding:12px 0;border-top:1px solid var(--line);font-size:15.5px}
+.item:first-of-type{border-top:none}
+.item .k{color:var(--ink2);font-size:13.5px;font-variant-numeric:tabular-nums}
+.note{font-size:12.8px;color:var(--ink3);padding:8px 0 6px;line-height:1.6}
+.dad{white-space:pre-wrap;font-size:15px;line-height:1.65;padding:6px 0}
+[hidden]{display:none!important}
+/* 同步层自建的角标在这个页面隐藏：状态在「更多」里已经有一行，角落不需要再挂一个 */
+#hubsync-badge{display:none!important}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="hero">
+  <img src="assets/hero.jpg" alt="两个穿深蓝校服的人侧脸对望，背后是逆光" width="900" height="675">
+  <div class="hero-txt">
+    <div class="d" id="dateline">—</div>
+    <h1>今天</h1>
+    <div class="s" id="heroSub">—</div>
+  </div>
+</div>
+
+<div class="talk">
+  <img src="assets/avatar-her.png" alt="">
+  <p id="talkLine">—</p>
+</div>
+
+<div class="wrap">
+  <div class="bar"><i id="barFill" style="width:0%"></i></div>
+
+  <!-- ═══ 今天 ═══ -->
+  <section id="pane-today">
+    <div class="block">
+      <div class="blockhd"><span>今日任务</span><span class="v" id="cntTask">0/0</span></div>
+      <ul class="list" id="listTask"></ul>
+    </div>
+
+    <div class="block">
+      <div class="blockhd"><span>喝水</span><span class="v" id="waterTxt">0/5</span></div>
+      <div class="hearts" id="hearts"></div>
+    </div>
+
+    <div class="block">
+      <div class="blockhd"><span>记一笔</span><span class="v" id="spendTotal">今天 ¥0</span></div>
+      <form class="form" id="spendForm">
+        <input id="amt" inputmode="decimal" placeholder="金额" autocomplete="off">
+        <input id="note" placeholder="买了什么" autocomplete="off">
+        <button class="btn" type="submit">记</button>
+      </form>
+      <ul class="list" id="listSpend"></ul>
+    </div>
+  </section>
+
+  <!-- ═══ 待办 ═══ -->
+  <section id="pane-backlog" hidden>
+    <div class="block">
+      <div class="blockhd"><span>待办 · 攒着慢慢做</span><span class="v" id="cntBacklog"></span></div>
+      <form class="form" id="backForm">
+        <input id="backNew" placeholder="加一条" autocomplete="off">
+        <button class="btn" type="submit">加</button>
+      </form>
+      <ul class="list" id="listBacklog"></ul>
+    </div>
+  </section>
+
+  <!-- ═══ 想法 ═══ -->
+  <section id="pane-idea" hidden>
+    <div class="block">
+      <div class="blockhd"><span>今天想到的</span><span class="v" id="cntIdea"></span></div>
+      <form class="form" id="ideaForm">
+        <input id="ideaNew" placeholder="一句话，别让它跑掉" autocomplete="off">
+        <button class="btn" type="submit">记</button>
+      </form>
+      <ul class="list" id="listIdea"></ul>
+    </div>
+  </section>
+
+  <!-- ═══ 更多 ═══ -->
+  <section id="pane-more" hidden>
+    <div class="block" id="dadBlock" hidden>
+      <div class="blockhd"><span>给爸的消息</span></div>
+      <div class="dad" id="dadMorning"></div>
+      <div class="dad" id="dadEvening"></div>
+      <div class="note">长按复制，自己发。发不发、什么时候发，你定。</div>
+    </div>
+
+    <div class="block">
+      <div class="blockhd"><span>这台手机上的数据</span></div>
+      <div class="item"><span>同步状态</span><span class="k" id="syncState">—</span></div>
+      <div class="item"><span>云端版本</span><span class="k" id="cloudVer">—</span></div>
+      <div class="item"><span>导出全部数据</span><button class="btn ghost" id="btnExport" type="button">导出</button></div>
+      <div class="note">数据存在这台手机上；云端只有加密备份。换手机或清缓存前先导出一份。</div>
+    </div>
+
+    <div class="block">
+      <div class="blockhd"><span>装到手机桌面</span></div>
+      <div class="note">安卓 / 华为：浏览器菜单 →「添加到主屏幕」或「安装应用」。<br>
+        iPhone：Safari 底部「分享」→「添加到主屏幕」。<br>
+        装好后点桌面图标直接全屏打开，没有地址栏，断网也能看。</div>
+    </div>
+  </section>
+</div>
+
+<nav>
+  <div class="tabs">
+    <button class="tab on" data-pane="today">今天</button>
+    <button class="tab" data-pane="backlog">待办</button>
+    <button class="tab" data-pane="idea">想法</button>
+    <button class="tab" data-pane="more">更多</button>
+  </div>
+</nav>
+
+<script src="hub-sync.js"></script>
+<script>
+(function () {
+  'use strict';
+  var PASS = '我爱凌波';            /* 只用于解密云端备份，不做界面门槛（红线 #125） */
+  var K = { notes:'v2-notes', spend:'v2-spend', content:'v2-content', seeded:'app-seeded' };
+  var CONT = {}, pane = 'today';
+
+  function load(k){ try { var a = JSON.parse(localStorage.getItem(k) || '[]'); return Array.isArray(a) ? a : []; } catch(e){ return []; } }
+  function save(k, a){
+    try { localStorage.setItem(k, JSON.stringify(a)); }
+    catch(e){ alert('这台手机存不下了（写入失败），先导出备份再清理。'); return; }
+    try { if (window.HUBSYNC) window.HUBSYNC.touch(); } catch(e){}
+  }
+  function today(){
+    var d = new Date(), p = function(n){ return (n<10?'0':'')+n; };
+    return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+  }
+  function uid(){ return 'a' + Date.now().toString(36) + Math.floor(Math.random()*1e4).toString(36); }
+
+  /* ── 云端内容 → 本地：只加不删，加过的不重复加 ── */
+  function seededMap(){ try { return JSON.parse(localStorage.getItem(K.seeded) || '{}') || {}; } catch(e){ return {}; } }
+  function applySeeds(){
+    var seeds = CONT.backlogSeeds || [], tasks = CONT.snapshotTasks || [];
+    var seen = seededMap(), notes = load(K.notes), added = 0, d = today();
+    function push(kind, day, body){
+      if (!body || seen[body]) return;
+      for (var i=0;i<notes.length;i++){ if (notes[i].body === body){ seen[body]=1; return; } }
+      notes.push({ id:uid(), day:day, kind:kind, body:body, done:false, tag:'seed', created_at:new Date().toISOString() });
+      seen[body] = 1; added++;
+    }
+    tasks.forEach(function(t){ push('task', d, t); });
+    seeds.forEach(function(t){ push('backlog', 'backlog', t); });
+    if (added) save(K.notes, notes);
+    try { localStorage.setItem(K.seeded, JSON.stringify(seen)); } catch(e){}
+  }
+
+  /* ── 今天 ── */
+  function renderToday(){
+    var d = today(), notes = load(K.notes);
+    var tasks = notes.filter(function(n){ return n.kind==='task' && n.day===d; });
+    var doneN = tasks.filter(function(n){ return n.done===true; }).length;
+
+    var now = new Date();
+    document.getElementById('dateline').textContent =
+      now.getFullYear() + ' · ' + (now.getMonth()+1) + '月' + now.getDate() + '日 ' +
+      ['周日','周一','周二','周三','周四','周五','周六'][now.getDay()];
+
+    var sub, line;
+    if (!tasks.length) {
+      sub = '今天还没排任务';
+      line = '今天还没有要做的事。想加什么，说一句给我，我推上来。';
+    } else if (doneN === tasks.length) {
+      sub = tasks.length + ' 件全做完了';
+      line = '<b>全都做完了。</b>今天到这里就可以，剩下的时间是你的。';
+    } else {
+      sub = tasks.length + ' 件，做完 ' + doneN + ' 件';
+      line = '今天还有 <b>' + (tasks.length - doneN) + ' 件</b>没做完。不用一次做完，先挑一件两分钟能搞定的。';
+    }
+    document.getElementById('heroSub').textContent = sub;
+    document.getElementById('talkLine').innerHTML = line;
+    document.getElementById('cntTask').textContent = doneN + '/' + tasks.length;
+    document.getElementById('barFill').style.width =
+      (tasks.length ? Math.round(doneN * 100 / tasks.length) : 0) + '%';
+
+    var ul = document.getElementById('listTask');
+    ul.innerHTML = '';
+    if (!tasks.length) ul.innerHTML = '<li class="empty">空的，也是好事。</li>';
+    tasks.forEach(function(n){ ul.appendChild(rowEl(n)); });
+
+    renderWater();
+    renderSpend();
+  }
+
+  function rowEl(n){
+    var li = document.createElement('li');
+    li.className = 'row' + (n.done ? ' done' : '');
+    var b = document.createElement('button');
+    b.className = 'tick'; b.type = 'button';
+    b.setAttribute('aria-label', n.done ? '标记为没做完' : '标记为做完');
+    b.onclick = function(){ toggle(n.id); };
+    var t = document.createElement('div');
+    t.className = 'body'; t.textContent = n.body;
+    li.appendChild(b); li.appendChild(t);
+    return li;
+  }
+  function toggle(id){
+    var notes = load(K.notes);
+    for (var i=0;i<notes.length;i++){
+      if (notes[i].id === id){ notes[i].done = !notes[i].done; notes[i].done_at = notes[i].done ? new Date().toISOString() : null; break; }
+    }
+    save(K.notes, notes);
+    render();
+  }
+
+  /* ── 喝水 ── */
+  function waterKey(){ return 'v2-water-' + today(); }
+  function waterN(){ return parseInt(localStorage.getItem(waterKey()) || '0', 10) || 0; }
+  function waterTarget(){ var t = parseInt(CONT.waterTarget, 10); return (t>=1 && t<=20) ? t : 8; }
+  function renderWater(){
+    var T = waterTarget(), n = waterN(), box = document.getElementById('hearts');
+    box.innerHTML = '';
+    for (var i=0;i<T;i++){
+      var c = document.createElement('button');
+      c.type = 'button';
+      c.className = 'heart' + (i < n ? ' on' : '');
+      c.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.3C6.4 16.7 3.4 13.6 3.4 9.9 3.4 7.2 5.4 5.2 7.9 5.2c1.7 0 3.2.9 4.1 2.3.9-1.4 2.4-2.3 4.1-2.3 2.5 0 4.5 2 4.5 4.7 0 3.7-3 6.8-8.6 10.4z"/></svg>';
+      c.setAttribute('aria-label', '第 ' + (i+1) + ' 杯');
+      c.onclick = (function(idx){ return function(){ setWater(waterN() === idx ? idx-1 : idx); }; })(i+1);
+      box.appendChild(c);
+    }
+    document.getElementById('waterTxt').textContent = n + '/' + T + (n>=T ? ' 够了' : '');
+  }
+  function setWater(v){
+    try { localStorage.setItem(waterKey(), String(Math.max(0, Math.min(20, v)))); } catch(e){}
+    renderWater();
+  }
+
+  /* ── 记账 ── */
+  function renderSpend(){
+    var d = today();
+    var rows = load(K.spend).filter(function(r){ return r.day === d; });
+    var sum = rows.reduce(function(a, r){ return a + (Number(r.amount) || 0); }, 0);
+    document.getElementById('spendTotal').textContent = '今天 ¥' + (Math.round(sum*100)/100);
+    var ul = document.getElementById('listSpend');
+    ul.innerHTML = '';
+    if (!rows.length){ ul.innerHTML = '<li class="empty">今天还没记。</li>'; return; }
+    rows.slice().reverse().forEach(function(r){
+      var li = document.createElement('li');
+      li.className = 'row';
+      var t = document.createElement('div');
+      t.className = 'body'; t.style.fontSize = '15.5px'; t.textContent = r.note || '（没写）';
+      var a = document.createElement('span');
+      a.className = 'amt'; a.textContent = '¥' + (Math.round((Number(r.amount)||0)*100)/100);
+      var x = document.createElement('button');
+      x.className = 'erase'; x.type = 'button'; x.textContent = '删';
+      x.onclick = function(){ delRow(K.spend, r.id); };
+      li.appendChild(t); li.appendChild(a); li.appendChild(x);
+      ul.appendChild(li);
+    });
+  }
+  function delRow(key, id){ save(key, load(key).filter(function(r){ return r.id !== id; })); render(); }
+
+  /* ── 待办 ── */
+  function renderBacklog(){
+    var rows = load(K.notes).filter(function(n){ return n.kind === 'backlog'; });
+    document.getElementById('cntBacklog').textContent =
+      rows.filter(function(n){ return !n.done; }).length + ' 条没做';
+    var ul = document.getElementById('listBacklog'); ul.innerHTML = '';
+    if (!rows.length){ ul.innerHTML = '<li class="empty">还没有待办。</li>'; return; }
+    rows.slice().reverse().forEach(function(n){
+      var li = rowEl(n);
+      var x = document.createElement('button');
+      x.className = 'erase'; x.type = 'button'; x.textContent = '删';
+      x.onclick = function(){ delRow(K.notes, n.id); };
+      li.appendChild(x); ul.appendChild(li);
+    });
+  }
+
+  /* ── 想法 ── */
+  function renderIdea(){
+    var d = today();
+    var rows = load(K.notes).filter(function(n){ return n.kind === 'idea' && n.day === d; });
+    document.getElementById('cntIdea').textContent = rows.length + ' 条';
+    var ul = document.getElementById('listIdea'); ul.innerHTML = '';
+    if (!rows.length){ ul.innerHTML = '<li class="empty">今天还没有想法。</li>'; return; }
+    rows.slice().reverse().forEach(function(n){
+      var li = document.createElement('li');
+      li.className = 'row';
+      var t = document.createElement('div');
+      t.className = 'body'; t.style.fontSize = '15.5px'; t.textContent = n.body;
+      var x = document.createElement('button');
+      x.className = 'erase'; x.type = 'button'; x.textContent = '删';
+      x.onclick = function(){ delRow(K.notes, n.id); };
+      li.appendChild(t); li.appendChild(x); ul.appendChild(li);
+    });
+  }
+
+  /* ── 更多 ── */
+  function renderMore(){
+    var dirty = false;
+    try { dirty = !!(window.HUBSYNC && window.HUBSYNC.isDirty()); } catch(e){}
+    document.getElementById('syncState').textContent = dirty ? '有改动没进云端' : '已同步';
+    document.getElementById('cloudVer').textContent = CONT.version || '—';
+    var dad = CONT.dad || {};
+    if (dad.morning || dad.evening){
+      document.getElementById('dadBlock').hidden = false;
+      document.getElementById('dadMorning').textContent = dad.morning || '';
+      document.getElementById('dadEvening').textContent = dad.evening || '';
+    }
+  }
+
+  function render(){
+    document.querySelectorAll('section').forEach(function(s){ s.hidden = (s.id !== 'pane-' + pane); });
+    document.querySelectorAll('.tab').forEach(function(b){ b.classList.toggle('on', b.dataset.pane === pane); });
+    if (pane === 'today') renderToday();
+    else if (pane === 'backlog') renderBacklog();
+    else if (pane === 'idea') renderIdea();
+    else renderMore();
+  }
+  window.__HUB_RENDER = function(){ applySeeds(); render(); };
+  window.__HUB_APPLY_CONTENT = function(c){
+    if (!c) return;
+    CONT = c;
+    try { localStorage.setItem(K.content, JSON.stringify(c)); } catch(e){}
+    applySeeds();
+    if (pane === 'today') renderToday();
+  };
+
+  document.querySelectorAll('.tab').forEach(function(b){
+    b.onclick = function(){
+      pane = b.dataset.pane;
+      try { localStorage.setItem('app-pane', pane); } catch(e){}
+      render(); window.scrollTo(0,0);
+    };
+  });
+
+  document.getElementById('spendForm').onsubmit = function(e){
+    e.preventDefault();
+    var amt = parseFloat(document.getElementById('amt').value);
+    var note = document.getElementById('note').value.trim();
+    if (!amt || amt <= 0){ document.getElementById('amt').focus(); return; }
+    var a = load(K.spend);
+    a.push({ id:uid(), day:today(), amount:Math.round(amt*100)/100, note:note });
+    save(K.spend, a);
+    document.getElementById('amt').value = ''; document.getElementById('note').value = '';
+    renderSpend();
+  };
+  document.getElementById('backForm').onsubmit = function(e){
+    e.preventDefault();
+    var v = document.getElementById('backNew').value.trim(); if (!v) return;
+    var a = load(K.notes);
+    a.push({ id:uid(), day:'backlog', kind:'backlog', body:v, done:false, tag:null, created_at:new Date().toISOString() });
+    save(K.notes, a); document.getElementById('backNew').value = ''; renderBacklog();
+  };
+  document.getElementById('ideaForm').onsubmit = function(e){
+    e.preventDefault();
+    var v = document.getElementById('ideaNew').value.trim(); if (!v) return;
+    var a = load(K.notes);
+    a.push({ id:uid(), day:today(), kind:'idea', body:v, done:false, tag:null, created_at:new Date().toISOString() });
+    save(K.notes, a); document.getElementById('ideaNew').value = ''; renderIdea();
+  };
+  document.getElementById('btnExport').onclick = function(){
+    try { window.HUBSYNC.exportLocal(); } catch(e){ alert('导出失败：' + e); }
+  };
+
+  try { CONT = JSON.parse(localStorage.getItem(K.content) || 'null') || window.CONTENT || {}; }
+  catch(e){ CONT = window.CONTENT || {}; }
+  try { var p = localStorage.getItem('app-pane'); if (p) pane = p; } catch(e){}
+  try {
+    var q = new URLSearchParams(location.search).get('pane');
+    if (q === 'today' || q === 'backlog' || q === 'idea' || q === 'more') pane = q;
+  } catch(e){}
+  applySeeds();
+  render();
+  if (window.HUBSYNC){ try { window.HUBSYNC.unlock(PASS); } catch(e){} }
+  if ('serviceWorker' in navigator){
+    window.addEventListener('load', function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); });
+  }
+})();
+</script>
+</body>
+</html>
