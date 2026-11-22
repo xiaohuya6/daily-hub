@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#f4f0e9" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#191612" media="(prefers-color-scheme: dark)">
-<title>Notes · v2</title>
+<title>今日工作台</title>
 <style>
 /* ══════════════════════════════════════════════════════════════
    daily-hub · v2 工作台（本地版）
@@ -291,7 +291,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 <div id="gate" hidden>
   <div class="card">
-    <h1>Notes · v2</h1>
+    <h1>今日工作台</h1>
     <div class="sub">输入口令进入</div>
     <input id="pw" type="password" placeholder="Passcode" autocomplete="current-password">
     <div class="row"><button class="save" id="unlock" style="width:100%">进入</button></div>
@@ -442,6 +442,10 @@ window.__HUB_APPLY_CONTENT = function (c) {
     if (c.dad) DADMSG = CONT.dad;
     if (c.snapshotTasks) SNAP_TASKS = CONT.snapshotTasks;
     if (c.routines) DEFAULT_ROUTINES = CONT.routines;
+    /* 2026-11-22 加：喝水杯数等「小部件」直接读 window.CONTENT.waterTarget
+       → 云端一改（比如今天要喝 5 杯），退出重进即刻生效，不用改页面代码 */
+    window.CONTENT = CONT;
+    if (window.__WATER_REDRAW) { try { window.__WATER_REDRAW(); } catch (e) {} }
   } catch (e) {}
 };
 
@@ -1241,9 +1245,18 @@ $('sente').onclick = () => { const k = 'dad-sent-'+cur+'-e'; localStorage.getIte
     var KEY = "v2-water-" + new Date().toISOString().slice(0,10);
     function get(){ try{ return parseInt(localStorage.getItem(KEY)||"0",10)||0; }catch(e){ return 0; } }
     function set(v){ try{ if(window.__safeSet) window.__safeSet(KEY, String(v)); else localStorage.setItem(KEY, String(v)); }catch(e){} }
+    /* 目标杯数：云端 content.waterTarget 优先（他说「今天要喝五杯水」→ 我改云端 → 退出重进即生效），
+       没配就默认 8。范围兜底 1–20，防手滑填 0 或 99 把界面撑爆。 */
+    function target(){
+      var t = (window.CONTENT && window.CONTENT.waterTarget) ? parseInt(window.CONTENT.waterTarget, 10) : 0;
+      if (!t || t < 1 || t > 20) t = 8;
+      return t;
+    }
+    var _lastT = 0;
     function draw(){
-      var n = get(); row.innerHTML = "";
-      for(var i=0;i<8;i++){
+      var n = get(), T = target(); _lastT = T;
+      row.innerHTML = "";
+      for(var i=0;i<T;i++){
         var d = document.createElement("span");
         d.textContent = i < n ? "🥤" : "○";
         d.style.cssText = "font-size:19px;cursor:pointer;user-select:none;line-height:1";
@@ -1255,13 +1268,15 @@ $('sente').onclick = () => { const k = 'dad-sent-'+cur+'-e'; localStorage.getIte
         };
         row.appendChild(d);
       }
-      msg.textContent = n >= 8 ? "今天够了 👌" : ("已喝 " + n + " / 8 杯");
+      msg.textContent = n >= T ? "今天够了 👌" : ("已喝 " + n + " / " + T + " 杯");
     }
+    window.__WATER_REDRAW = draw;   // 云端内容合并进来后由 __HUB_APPLY_CONTENT 调它重画
     // 口令门一消失（= 已进入）就显示这块 —— 不等云端登录结果
     function tick(){
       var g = document.getElementById("gate");
       var locked = g && !g.hidden && getComputedStyle(g).display !== "none";
       card.style.display = locked ? "none" : "block";
+      if (target() !== _lastT) draw();   // 云端改了杯数（如 8→5）→ 自动重画，不用退出重进
     }
     draw(); tick(); setInterval(tick, 800);
   }
