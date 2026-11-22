@@ -249,7 +249,7 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
   'use strict';
   var PASS = '我爱凌波';            /* 只用于解密云端备份，不做界面门槛（红线 #125） */
   var K = { notes:'v2-notes', spend:'v2-spend', content:'v2-content', seeded:'app-seeded' };
-  var CONT = {}, pane = 'today';
+  var CONT = {}, pane = 'today', SYNCING = true;
 
   function load(k){ try { var a = JSON.parse(localStorage.getItem(k) || '[]'); return Array.isArray(a) ? a : []; } catch(e){ return []; } }
   function save(k, a){
@@ -292,7 +292,10 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
       ['周日','周一','周二','周三','周四','周五','周六'][now.getDay()];
 
     var sub, line;
-    if (!tasks.length) {
+    if (!tasks.length && SYNCING) {
+      sub = '正在读今天的安排';
+      line = '等我一下，我在读今天的安排…';
+    } else if (!tasks.length) {
       sub = '今天还没排任务';
       line = '今天还没有要做的事。想加什么，说一句给我，我推上来。';
     } else if (doneN === tasks.length) {
@@ -446,7 +449,7 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
   window.__HUB_RENDER = function(){ applySeeds(); render(); };
   window.__HUB_APPLY_CONTENT = function(c){
     if (!c) return;
-    CONT = c;
+    CONT = c; SYNCING = false;
     try { localStorage.setItem(K.content, JSON.stringify(c)); } catch(e){}
     applySeeds();
     if (pane === 'today') renderToday();
@@ -498,7 +501,12 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
   } catch(e){}
   applySeeds();
   render();
-  if (window.HUBSYNC){ try { window.HUBSYNC.unlock(PASS); } catch(e){} }
+  if (window.HUBSYNC){
+    try {
+      var pr = window.HUBSYNC.unlock(PASS);
+      if (pr && pr.then) pr.then(function(){ SYNCING = false; render(); }, function(){ SYNCING = false; render(); });
+    } catch(e){ SYNCING = false; }
+  } else { SYNCING = false; }
   if ('serviceWorker' in navigator){
     window.addEventListener('load', function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); });
   }
