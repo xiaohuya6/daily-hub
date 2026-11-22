@@ -290,16 +290,22 @@ var SEEDS = [
 ];
 
 /* ================= 每日清单模板 ================= */
+/* wk     = 周末可以不做（软，仍算在分母里）
+   wkHard = 周末【别做】（硬，移出清单、不计入分母）
+            依据（他 2026-11-22 原话）：「周末加不了人。周末业务员放假，
+            他不会去填通过你的，加人没用，还浪费名单。」
+            ⇒ 加人是主动动作，对方不处理 = 白耗名单。不是"可以不做"，是"做了有害"。 */
 function tasks(){
   var list=[
     {g:'上午', n:'吃维生素（第 1 次）', d:'早饭后，别空腹'},
-    {g:'上午', n:'车险：加业务员', d:'加到微信弹「添加过于频繁」就停，弹了就收工'},
+    {g:'上午', n:'车险：加业务员', d:'加到微信弹「添加过于频繁」就停，弹了就收工', wkHard:1},
     {g:'上午', n:'车险：报价', d:'业务员发消息，看到就报', soft:'有就报'},
     {g:'上午', n:'车险：打字', d:'有人聊就聊，约 5 分钟', soft:'有人找才做'},
-    {g:'上午', n:'货代：加 2 个客户', d:'加不到不算失败，电话打了就算做了', wk:1},
-    {g:'上午', n:'货代：打字 5 分钟', d:'回客户消息', wk:1, soft:'有人找才做'},
-    {g:'下午', n:'车险：加人 / 报价', d:'业务员白天在线，这是主力时段'},
-    {g:'下午', n:'货代：补 2 个客户', d:'上午没加够就在这补', wk:1, soft:'上午够了就跳过'},
+    {g:'上午', n:'货代：加 2 个客户', d:'加不到不算失败，电话打了就算做了', wkHard:1},
+    {g:'上午', n:'货代：打字 5 分钟', d:'回客户消息', soft:'有人找才做'},
+    {g:'下午', n:'车险：加人（第二轮）', d:'业务员白天在线，这是主力时段', wkHard:1},
+    {g:'下午', n:'车险：报价（下午场）', d:'下午的单子通常比上午多', soft:'有就报'},
+    {g:'下午', n:'货代：补 2 个客户', d:'上午没加够就在这补', wkHard:1, soft:'上午够了就跳过'},
     {g:'晚上', n:'三角洲：收菜', d:'10–20 分钟，可挂机'},
     {g:'晚上', n:'吃维生素（第 2 次）', d:'晚饭后'},
     {g:'晚上', n:'给爸发一条消息', d:'一句就行，别攒着'},
@@ -315,49 +321,69 @@ function tasks(){
   return extra.concat(list);
 }
 
+/* 周末把 wkHard 的条目拆出去：不是"可不做"，是"别做" */
+function splitTasks(){
+  var ts=tasks(), on=[], off=[];
+  ts.forEach(function(t,i){
+    t.idx=i;
+    if(isWeekend && t.wkHard) off.push(t); else on.push(t);
+  });
+  return {on:on, off:off, all:ts};
+}
+
 /* ================= 渲染：今天 ================= */
 function renderToday(){
   var box=document.getElementById('todayList');
-  var ts=tasks();
+  var sp=splitTasks(), ts=sp.on, off=sp.off;
   if(!DB.today[TODAY]) DB.today[TODAY]={};
   var done=DB.today[TODAY];
 
   var groups={},order=[];
-  ts.forEach(function(t,i){
-    t.idx=i;
+  ts.forEach(function(t){
     if(!groups[t.g]){ groups[t.g]=[]; order.push(t.g); }
     groups[t.g].push(t);
   });
 
   var html='';
+  function drawItem(t, isOff){
+    var checked=!!done[t.idx];
+    return '<div class="item'+(checked?' done':'')+(isOff?' rest':'')+'" data-i="'+t.idx+'">'
+      + '<div class="box'+(checked?' on':'')+'">'+(checked?'✓':'')+'</div>'
+      + '<div class="t"><b>'+t.n
+      + (isOff?'<span class="tag warn">周末停手</span>':'')
+      + (!isOff && t.soft?'<span class="tag">'+t.soft+'</span>':'')
+      + '</b>'+(t.d?'<small>'+t.d+'</small>':'')+'</div></div>';
+  }
+
   order.forEach(function(g){
     var arr=groups[g];
     var on=arr.filter(function(t){ return done[t.idx]; }).length;
     html+='<div class="card"><h2>'+g+' <em>'+on+'/'+arr.length+'</em></h2>';
-    arr.forEach(function(t){
-      var rest=(isWeekend && t.wk);
-      var checked=!!done[t.idx];
-      html+='<div class="item'+(checked?' done':'')+(rest?' rest':'')+'" data-i="'+t.idx+'">'
-        + '<div class="box'+(checked?' on':'')+'">'+(checked?'✓':'')+'</div>'
-        + '<div class="t"><b>'+t.n
-        + (rest?'<span class="tag warn">周末可不做</span>':'')
-        + (t.soft&&!rest?'<span class="tag">'+t.soft+'</span>':'')
-        + '</b>'+(t.d?'<small>'+t.d+'</small>':'')+'</div></div>';
-    });
+    arr.forEach(function(t){ html+=drawItem(t,false); });
     html+='</div>';
   });
+
+  /* 周末停手那一组：单独放最后，不计入分母 */
+  if(off.length){
+    html+='<div class="card"><h2>周末停手 <em>不算你没做</em></h2>';
+    html+='<p class="hint" style="margin:0 2px 8px">业务员放假，加了也不通过，还白耗名单。周一再干。</p>';
+    off.forEach(function(t){ html+=drawItem(t,true); });
+    html+='</div>';
+  }
   box.innerHTML=html;
 
-  var all=ts.length;
+  var all=ts.length;                       /* ← 分母只算"今天该做的" */
   var got=0;
-  for(var i=0;i<all;i++){ if(done[i]) got++; }
+  ts.forEach(function(t){ if(done[t.idx]) got++; });
   document.getElementById('progNum').textContent=got;
   document.getElementById('progAll').textContent='/ '+all;
   document.getElementById('progBar').style.width=(all? got/all*100 : 0)+'%';
 
   var hint='每天就这几件，做完就算过完一天。';
   if(all&&got>=all) hint='全做完了。今天就到这，别加码。';
-  else if(got===0) hint=isWeekend? '周末，业务员也休息。先把维生素和给爸的消息做了就行。' : '从最简单的那个开始，不用按顺序。';
+  else if(got===0) hint=isWeekend
+    ? '周日就这几件。加人今天不做——加了也白加，还耗名单。'
+    : '从最简单的那个开始，不用按顺序。';
   else if(got>=all*0.6) hint='过半了，剩的挑一个做掉就收工。';
   document.getElementById('progHint').textContent=hint;
 }
@@ -537,14 +563,16 @@ function buildOut(){
   var L=[];
   L.push('【小胡日报】'+TODAY+' '+WD[DOW]);
 
-  var ts=tasks(), done=DB.today[TODAY]||{};
+  var sp=splitTasks(), ts=sp.on, done=DB.today[TODAY]||{};
   var got=0, miss=[];
-  ts.forEach(function(t,i){
-    if(done[i]) got++; else miss.push(t.n);
+  ts.forEach(function(t){
+    if(done[t.idx]) got++; else miss.push(t.n);
   });
   L.push('清单 '+got+'/'+ts.length);
   if(miss.length) L.push('没做：'+miss.join('、'));
   else L.push('全做完了');
+  if(sp.off.length) L.push('（周末停手 '+sp.off.length+' 条没算进去：'
+    + sp.off.map(function(t){ return t.n; }).join('、') + '）');
 
   var open=DB.todo.filter(function(x){ return !x.done; });
   if(open.length) L.push('待办还剩 '+open.length+' 条：'+open.map(function(x){ return x.txt; }).join('；'));
