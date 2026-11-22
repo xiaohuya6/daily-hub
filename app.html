@@ -248,7 +248,7 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
 (function () {
   'use strict';
   var PASS = '我爱凌波';            /* 只用于解密云端备份，不做界面门槛（红线 #125） */
-  var K = { notes:'v2-notes', spend:'v2-spend', content:'v2-content', seeded:'app-seeded' };
+  var K = { notes:'v2-notes', spend:'v2-spend', content:'v2-content', seeded:'app-seeded', pruned:'app-pruned' };
   var CONT = {}, pane = 'today', SYNCING = true;
 
   function load(k){ try { var a = JSON.parse(localStorage.getItem(k) || '[]'); return Array.isArray(a) ? a : []; } catch(e){ return []; } }
@@ -279,6 +279,44 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
     if (added) save(K.notes, notes);
     try { localStorage.setItem(K.seeded, JSON.stringify(seen)); } catch(e){}
   }
+
+  /* ── 云端下发的「一次性擦除 + 重建」（2026-11-23 加）──────────────
+     为什么要它：老 applySeeds 只会「加」，从不「删」；而 hub-sync 的 mergeInto
+     又只补本地没有的、绝不用云端覆盖本地 ⇒ 一旦种进去的旧待办，从这条路上永远删不掉。
+     他 11-22 问「为什么有 500 多条，你给我删删掉一点」—— 只有 App 自己肯删，才删得掉。
+     语义：tag==='seed' 的待办全清，只留 keep 白名单；他自己手打的（tag≠seed）一条不动。
+     幂等：执行过就把 version 记在 localStorage，同一个 version 不会跑第二次。 */
+  function applyPrune(){
+    var pr = CONT.backlogPrune;
+    if (!pr || !pr.version) return false;
+    try { if (localStorage.getItem(K.pruned) === pr.version) return false; } catch(e){}
+    var keep = pr.keep || [], keepSet = {}, dropSet = {}, notes = load(K.notes), before = 0, kept;
+    for (var i = 0; i < keep.length; i++) keepSet[keep[i]] = 1;
+    var dropArr = pr.drop || [];
+    for (var d = 0; d < dropArr.length; d++) dropSet[dropArr[d]] = 1;
+    before = notes.filter(function(n){ return n.kind === 'backlog'; }).length;
+    kept = notes.filter(function(n){
+      if (n.kind !== 'backlog') return true;      /* 今日任务 / 想法 / 账 一律不动 */
+      if (dropSet[n.body]) return false;          /* 点名删：不看 tag，说删就删 */
+      if (n.tag !== 'seed') return true;          /* 其余他自己手打的一条不动 */
+      return !!keepSet[n.body];                   /* 白名单里原样保留 */
+    });
+    var have = {};
+    for (var j = 0; j < kept.length; j++){ if (kept[j].kind === 'backlog') have[kept[j].body] = 1; }
+    for (var k = 0; k < keep.length; k++){
+      if (have[keep[k]]) continue;
+      kept.push({ id:uid(), day:'backlog', kind:'backlog', body:keep[k],
+                  done:false, tag:'seed', created_at:new Date().toISOString() });
+    }
+    save(K.notes, kept);
+    /* 判重表清空：否则被删的旧 body 还躺在 seen 里，将来重加会被挡住 */
+    try { localStorage.setItem(K.seeded, '{}'); } catch(e){}
+    try { localStorage.setItem(K.pruned, pr.version); } catch(e){}
+    try { console.log('[hub] 待办清理 v' + pr.version + '：' + before + ' → ' +
+      kept.filter(function(n){ return n.kind==='backlog'; }).length); } catch(e){}
+    return true;
+  }
+  function seedAll(){ applyPrune(); applySeeds(); }
 
   /* ── 今天 ── */
   function renderToday(){
@@ -446,12 +484,12 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
     else if (pane === 'idea') renderIdea();
     else renderMore();
   }
-  window.__HUB_RENDER = function(){ applySeeds(); render(); };
+  window.__HUB_RENDER = function(){ seedAll(); render(); };
   window.__HUB_APPLY_CONTENT = function(c){
     if (!c) return;
     CONT = c; SYNCING = false;
     try { localStorage.setItem(K.content, JSON.stringify(c)); } catch(e){}
-    applySeeds();
+    seedAll();
     if (pane === 'today') renderToday();
   };
 
@@ -499,7 +537,7 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
     var q = new URLSearchParams(location.search).get('pane');
     if (q === 'today' || q === 'backlog' || q === 'idea' || q === 'more') pane = q;
   } catch(e){}
-  applySeeds();
+  seedAll();
   render();
   if (window.HUBSYNC){
     try {
