@@ -115,7 +115,7 @@
   }
   function writeTable(k, arr) {
     try { localStorage.setItem(LSK[k], JSON.stringify(arr)); }
-    catch (e) { if (window.__hubStoreFail) window.__hubStoreFail('☁ 写入 ' + k + ' 失败'); else console.error(e); }
+    catch (e) { if (window.__hubStoreFail) window.__hubStoreFail('写入 ' + k + ' 失败'); else console.error(e); }
   }
   function localSnapshot() {
     var o = { schema: 1, updated: new Date().toISOString(), source: 'daily-hub' };
@@ -146,7 +146,7 @@
     /* 内容（今日任务 / 给爸消息 / 例行）：云端有就用云端（内容以云为权威） */
     if (cloud.content) {
       try { localStorage.setItem(LSK.content, JSON.stringify(cloud.content)); }
-      catch (e) { if (window.__hubStoreFail) window.__hubStoreFail('☁ 写入 content 失败'); else console.error(e); }
+      catch (e) { if (window.__hubStoreFail) window.__hubStoreFail('写入 content 失败'); else console.error(e); }
       if (window.__HUB_APPLY_CONTENT) { try { window.__HUB_APPLY_CONTENT(cloud.content); } catch (e) {} }
     }
     return added;
@@ -155,11 +155,11 @@
   /* ── 入口：口令 → 解密云备份 → 合并 ─────────────────────────── */
   function unlock(pass) {
     if (!(window.crypto && crypto.subtle)) {
-      setBadge('☁ 本机数据只在本机（浏览器不支持加密）', '#c0392b');
+      setBadge('本机数据只在本机（浏览器不支持加密）', '#c0392b');
       if (window.__HUB_RENDER) { try { window.__HUB_RENDER(); } catch (e) {} }
       return Promise.resolve(false);
     }
-    setBadge('☁ 读取云端备份…', '#888');
+    setBadge('读取云端备份…', '#888');
     return deriveKey(pass).then(function (key) {
       return fetch(ENC_URL + '?v=' + Date.now(), { cache: 'no-store' }).then(function (r) {
         if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -167,15 +167,15 @@
       }).then(function (blob) { return decryptBlob(key, blob); })
         .then(function (cloud) {
           var added = mergeInto(cloud);
-          setBadge(added ? '☁ 云端补回 ' + added + ' 条' : '☁ 已同步（云端备份在位）', '#2e7d32');
+          setBadge(added ? '云端补回 ' + added + ' 条' : '已同步（云端备份在位）', '#2e7d32');
           if (window.__HUB_RENDER) { try { window.__HUB_RENDER(); } catch (e) {} }
           return true;
         });
     }).catch(function (e) {
       var m = String((e && e.message) || e);
       setBadge(m === 'TOKEN_BAD' || /operation|decrypt|DataError/i.test(m)
-        ? '☁ 口令对不上云端备份（本机数据照常用）'
-        : '☁ 云端备份暂时读不到（本机数据照常用）', '#c0392b');
+        ? '口令对不上云端备份（本机数据照常用）'
+        : '云端备份暂时读不到（本机数据照常用）', '#c0392b');
       if (window.__HUB_RENDER) { try { window.__HUB_RENDER(); } catch (e2) {} }
       return false;
     });
@@ -184,7 +184,7 @@
   /* ── 本地写之后：只标记「待备份」，不发网络请求（无定时器） ────── */
   function touch() {
     try { localStorage.setItem(DIRTY_KEY, String(Date.now())); } catch (e) {}
-    setBadge('☁ 已存本机（待同步云端）', '#f39c12');
+    setBadge('已存本机（待同步云端）', '#f39c12');
   }
 
   /* ── 导出：给「手动/自动备份到云端」用 ─────────────────────── */
@@ -198,7 +198,7 @@
   /* 备份完成后由我（WorkBuddy）在浏览器里调用，清掉「待备份」标记 */
   function markBackedUp() {
     try { localStorage.removeItem(DIRTY_KEY); } catch (e) {}
-    setBadge('☁ 已同步（云端备份在位）', '#2e7d32');
+    setBadge('已同步（云端备份在位）', '#2e7d32');
   }
 
   window.HUBSYNC = {
