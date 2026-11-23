@@ -146,6 +146,24 @@ body.flat .wrap{padding-top:max(10px, env(safe-area-inset-top))}
 .btn:active{opacity:.82}
 .btn.ghost{background:transparent;color:var(--ink2);border:1px solid var(--line)}
 
+/* ── 记账：支出/收入切换 + 固定条目（点一下就记一笔）─────────────
+   他 2026-11-23：「那个是有固定的条，固定的一些条目吧，我只要点一下就可以了」 */
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:11px;overflow:hidden;margin:2px 0 9px}
+.seg button{border:none;background:transparent;color:var(--ink3);font-size:13.5px;padding:7px 17px;cursor:pointer;font-family:inherit}
+.seg button.on{background:var(--rose);color:var(--ground)}
+.quick{display:flex;gap:8px;overflow-x:auto;padding:1px 0 10px;scrollbar-width:none}
+.quick::-webkit-scrollbar{display:none}
+.q{
+  flex:0 0 auto;display:flex;flex-direction:column;gap:2px;align-items:flex-start;
+  min-height:44px;padding:8px 13px;border:1px solid var(--line);border-radius:13px;
+  background:var(--surface);color:var(--ink2);font-family:inherit;font-size:12.5px;
+  cursor:pointer;text-align:left
+}
+.q b{font-size:14.5px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink)}
+.q:active{transform:scale(.96)}
+.q[data-dir="in"]{border-color:var(--rose);background:var(--rose-soft)}
+.q[data-dir="in"] b{color:var(--rose)}
+
 /* ── 今天：三张汇总卡 ── */
 .cards{display:grid;gap:10px;padding:2px 0 4px}
 .card{
@@ -266,6 +284,11 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
         <input id="note" placeholder="买了什么" autocomplete="off">
         <button class="btn" type="submit">记</button>
       </form>
+      <div class="seg" id="dirSeg">
+        <button type="button" class="on" data-dir="out">支出</button>
+        <button type="button" data-dir="in">收入</button>
+      </div>
+      <div class="quick" id="quickSpend"></div>
       <label class="chk"><input type="checkbox" id="mineChk" checked><span>这是我的支出</span></label>
       <div class="forwho" id="forWho" hidden>
         <input id="who" placeholder="谁花的（妈 / 哥 / 她）" autocomplete="off">
@@ -692,12 +715,54 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
     renderWater();
   }
 
-  /* ── 记账 ── */
+  /* ── 记账 ──
+     🔴 2026-11-23 加两样：① 固定条目（点一下就落一笔）② 收入（dir:'in'）。
+        他原话：「那个是有固定的条，固定的一些条目吧，我只要点一下就可以了…
+        还有一个进账是 66 块六毛六，这是我算一下每天上班的一个工资，2000 块钱平均 30 天」
+        老数据没有 dir 字段 ⇒ 一律当支出（只有 r.dir === 'in' 才算收入），历史账不会被算反。 */
+  var SPEND_DIR = 'out';          /* 手输时记成支出还是收入，靠上面那个切换按钮改 */
+  function r2(v){ return Math.round((Number(v) || 0) * 100) / 100; }
+  function sumBy(rows, dir){
+    return rows.reduce(function(a, r){
+      if ((r.dir === 'in' ? 'in' : 'out') !== dir) return a;
+      return a + (Number(r.amount) || 0);
+    }, 0);
+  }
+  function renderQuick(){
+    var box = document.getElementById('quickSpend');
+    if (!box) return;
+    var qs = CONT.quickSpend || [];
+    box.innerHTML = '';
+    if (!qs.length){ box.hidden = true; return; }
+    box.hidden = false;
+    qs.forEach(function(q){
+      var amt = r2(q.amount);
+      if (!amt) return;
+      var dir = (q.dir === 'in') ? 'in' : 'out';
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'q';
+      b.dataset.dir = dir;                    /* CSS 靠 [data-dir="in"] 区分收入 */
+      var n = document.createElement('span'); n.textContent = q.body || '';
+      var v = document.createElement('b');
+      v.textContent = (dir === 'in' ? '+' : '') + '¥' + amt;
+      b.appendChild(n); b.appendChild(v);
+      b.onclick = function(){
+        var a = load(K.spend);
+        a.push({ id:uid(), day:today(), amount:amt, note:q.body || '',
+                 mine:true, dir:dir, quick:(q.id || '') });
+        save(K.spend, a);
+        renderSpend();
+        try { if (navigator.vibrate) navigator.vibrate(8); } catch(e){}
+      };
+      box.appendChild(b);
+    });
+  }
   function renderSpend(){
     var d = today(), all = load(K.spend);
     var rows = all.filter(function(r){ return r.day === d; });
-    var sum = rows.reduce(function(a, r){ return a + (Number(r.amount) || 0); }, 0);
-    document.getElementById('spendTotal').textContent = '今天 ¥' + (Math.round(sum*100)/100);
+    var outS = sumBy(rows, 'out'), inS = sumBy(rows, 'in');
+    document.getElementById('spendTotal').textContent =
+      '支出 ¥' + r2(outS) + (inS ? '　收入 +¥' + r2(inS) : '');
 
     var ul = document.getElementById('listSpend');
     ul.innerHTML = '';
@@ -721,8 +786,10 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
           w.textContent = bits.join(' · ');
           wrap.appendChild(w);
         }
+        var isIn = (r.dir === 'in');
         var a = document.createElement('span');
-        a.className = 'amt'; a.textContent = '¥' + (Math.round((Number(r.amount)||0)*100)/100);
+        a.className = 'amt'; a.textContent = (isIn ? '+¥' : '¥') + r2(r.amount);
+        if (isIn) a.style.color = 'var(--rose)';
         var x = document.createElement('button');
         x.className = 'erase'; x.type = 'button'; x.textContent = '删';
         x.onclick = function(){ delRow(K.spend, r.id); };
@@ -731,14 +798,17 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
       });
     }
 
-    /* 本月：按天汇总，一行一天 */
-    var m = d.slice(0, 7), mt = 0, byDay = {};
+    /* 本月：按天汇总，一行一天（支出和收入分开算，别混成一个数） */
+    var m = d.slice(0, 7), mo = 0, mi = 0, byDay = {};
     all.forEach(function(r){
       if (!r.day || r.day.slice(0, 7) !== m) return;
-      var v = Number(r.amount) || 0;
-      mt += v; byDay[r.day] = (byDay[r.day] || 0) + v;
+      var v = Number(r.amount) || 0, isIn = (r.dir === 'in');
+      if (isIn) mi += v; else mo += v;
+      var cell = byDay[r.day] || (byDay[r.day] = { out:0, in:0 });
+      if (isIn) cell.in += v; else cell.out += v;
     });
-    document.getElementById('spendMonth').textContent = '¥' + (Math.round(mt*100)/100);
+    document.getElementById('spendMonth').textContent =
+      '支出 ¥' + r2(mo) + (mi ? '　收入 +¥' + r2(mi) : '');
 
     var ul2 = document.getElementById('listMonth');
     ul2.innerHTML = '';
@@ -751,7 +821,9 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
       t.className = 'body'; t.style.fontSize = '15.5px';
       t.textContent = dd.slice(5).replace('-', '/') + (dd === d ? '　今天' : '');
       var a = document.createElement('span');
-      a.className = 'amt'; a.textContent = '¥' + (Math.round(byDay[dd]*100)/100);
+      a.className = 'amt';
+      var c = byDay[dd];
+      a.textContent = '¥' + r2(c.out) + (c.in ? ' / +¥' + r2(c.in) : '');
       var x = document.createElement('button');
       x.className = 'erase'; x.type = 'button'; x.textContent = '删';
       x.onclick = function(){ clearDay(dd); };
@@ -818,6 +890,9 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
   }
 
   function render(){
+    /* 记账的固定条目每次都重建 —— 内容从云端下发（quickSpend），换内容只需升 content 版本。
+       放在这里无条件跑（不是只在记账页跑）：元素隐藏时渲染没有副作用，切过去就绪、不闪。 */
+    renderQuick();
     /* 主视觉 + 对话框只在「今天」页出现；切到记账/待办时省掉半屏 */
     var isToday = (pane === 'today');
     var heroEl = document.querySelector('.hero'), talkEl = document.querySelector('.talk');
@@ -836,6 +911,8 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
     else renderMore();
   }
   window.__HUB_RENDER = function(){ seedAll(); render(); };
+  /* 测试钩子（_test_prune.js 用）：切页签。和 __HUB_RENDER 同一类，不影响功能。 */
+  window.__HUB_GOTO = function(p){ goPane(p); };
   window.__HUB_APPLY_CONTENT = function(c){
     if (!c) return;
     /* 云端版本比手上旧 → 忽略（防止旧备份把新内容盖回去，比如擦除指令被回滚） */
@@ -868,7 +945,8 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
     var who  = document.getElementById('who').value.trim();
     var why  = document.getElementById('why').value.trim();
     var a = load(K.spend);
-    var row = { id:uid(), day:today(), amount:Math.round(amt*100)/100, note:note, mine:mine };
+    var row = { id:uid(), day:today(), amount:Math.round(amt*100)/100, note:note,
+                mine:mine, dir:SPEND_DIR };
     /* 只有"不是我的"才存 who/why —— 老数据没这两个字段，读的时候按 mine!==false 当"是我的"，不丢 */
     if (!mine){ row.who = who; row.why = why; }
     a.push(row);
@@ -882,6 +960,22 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
   document.getElementById('mineChk').onchange = function(){
     document.getElementById('forWho').hidden = this.checked;
   };
+  /* 支出 / 收入 切换（他 11-23 加了工资进账，所以手输也要能记收入） */
+  document.querySelectorAll('#dirSeg button').forEach(function(btn){
+    btn.onclick = function(){
+      SPEND_DIR = btn.getAttribute('data-dir') === 'in' ? 'in' : 'out';
+      document.querySelectorAll('#dirSeg button').forEach(function(o){
+        o.classList.toggle('on', o === btn);
+      });
+      /* 收入不适用「是不是我的支出」——切到收入就把那行收起来，别让他看糊涂 */
+      var chk = document.getElementById('mineChk');
+      if (chk){
+        var lab = chk.parentNode;
+        if (lab && lab.classList && lab.classList.contains('chk')) lab.hidden = (SPEND_DIR === 'in');
+        if (SPEND_DIR === 'in'){ document.getElementById('forWho').hidden = true; }
+      }
+    };
+  });
   document.getElementById('routineForm').onsubmit = function(e){
     e.preventDefault();
     var v = document.getElementById('routineNew').value.trim(); if (!v) return;
