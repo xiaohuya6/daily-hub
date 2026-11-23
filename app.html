@@ -559,6 +559,17 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
       ul.innerHTML = '<li class="empty">还没有每天要做的事。下面加一条。</li>';
       return;
     }
+    /* 排序：以 routinesSeed 的数组顺序为准（工作线在前、生活线次之、副业最后）。
+       为什么不在云端改数组顺序：本地已存的那批不会因为云端重排而变序，
+       只有渲染时按 seed 排才对他手机上已有的数据也生效。
+       seed 里没有的（他自己加的、或删剩的旧条目）排最后，不丢。 */
+    var order = {}, seeds = (CONT.routinesSeed || []);
+    for (var si = 0; si < seeds.length; si++){ if (seeds[si] && seeds[si].id) order[seeds[si].id] = si; }
+    rows = rows.slice().sort(function(a, b){
+      var ia = (a.id in order) ? order[a.id] : 9999;
+      var ib = (b.id in order) ? order[b.id] : 9999;
+      return ia - ib;
+    });
     rows.forEach(function(r){
       var on = (r.done_on === d);
       var li = document.createElement('li');
