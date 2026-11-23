@@ -157,9 +157,24 @@ body.flat .wrap{padding-top:max(10px, env(safe-area-inset-top))}
 
 /* ── 记账：支出/收入切换 + 固定条目（点一下就记一笔）─────────────
    他 2026-11-23：「那个是有固定的条，固定的一些条目吧，我只要点一下就可以了」 */
-.seg{display:inline-flex;border:1px solid var(--line);border-radius:11px;overflow:hidden;margin:2px 0 9px}
-.seg button{border:none;background:transparent;color:var(--ink3);font-size:13.5px;padding:7px 17px;cursor:pointer;font-family:inherit}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:11px;overflow:hidden;margin:2px 0 9px}.seg button{border:none;background:transparent;color:var(--ink3);font-size:13.5px;padding:7px 17px;cursor:pointer;font-family:inherit}
 .seg button.on{background:var(--rose);color:var(--ground)}
+/* 记账的日期切换条（他 2026-11-24 要能翻到昨天/前天/往后） */
+.days{display:flex;align-items:center;gap:6px;margin:0 0 10px;padding:4px 6px;
+  border:1px solid var(--line);border-radius:12px;background:var(--surface);position:relative}
+.days button{border:none;background:transparent;color:var(--ink2);font-size:20px;line-height:1;
+  width:38px;height:36px;cursor:pointer;font-family:inherit;border-radius:9px;flex:0 0 auto}
+.days button:active{background:var(--rose-soft)}
+.days .lb{flex:1;text-align:center;font-size:14px;color:var(--ink);cursor:pointer;
+  padding:7px 0;font-variant-numeric:tabular-nums;user-select:none}
+.days .lb small{color:var(--ink3);font-size:11.5px;margin-left:6px;font-weight:400}
+.days .lb.off{color:var(--rose)}
+.days .back{border:1px solid var(--line);font-size:12px;width:auto;height:30px;
+  padding:0 10px;color:var(--ink2);flex:0 0 auto}
+/* 真正被调起的是这个 —— 必须留在 DOM 且不是 display:none，否则 showPicker() 抛 InvalidStateError。
+   盖上整条、全透明、不吃点击（点击由中间那行文字接），程序唤起时才会弹系统日历。 */
+.days .pick{position:absolute;left:0;top:0;width:100%;height:100%;opacity:0;
+  border:none;padding:0;margin:0;pointer-events:none;font-family:inherit}
 .quick{display:flex;gap:8px;overflow-x:auto;padding:1px 0 10px;scrollbar-width:none}
 .quick::-webkit-scrollbar{display:none}
 .q{
@@ -288,6 +303,15 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
   <section id="pane-spend" hidden>
     <div class="block">
       <div class="blockhd"><span>记一笔</span><span class="v" id="spendTotal">今天 ¥0</span></div>
+      <!-- 日期切换（他 2026-11-24 00:2x 要的：能翻到昨天/前天，往后推也行）
+           ‹ › 一天一天翻；中间那行点开是系统日期选择器，直接跳。 -->
+      <div class="days" id="dayBar">
+        <button type="button" id="dayPrev" aria-label="前一天">‹</button>
+        <span class="lb" id="dayLabel">今天</span>
+        <button type="button" id="dayNext" aria-label="后一天">›</button>
+        <button type="button" class="back" id="dayBack" hidden>今天</button>
+        <input type="date" id="dayPick" class="pick">
+      </div>
       <form class="form" id="spendForm">
         <input id="amt" inputmode="decimal" placeholder="金额" autocomplete="off">
         <input id="note" placeholder="买了什么" autocomplete="off">
@@ -306,7 +330,7 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
       <ul class="list" id="listSpend"></ul>
     </div>
     <div class="block">
-      <div class="blockhd"><span>这个月</span><span class="v" id="spendMonth">¥0</span></div>
+      <div class="blockhd"><span id="spendMonthHd">这个月</span><span class="v" id="spendMonth">¥0</span></div>
       <ul class="list" id="listMonth"></ul>
       <div class="note">按月汇总，一行一天，点「删」清掉当天全部。</div>
     </div>
@@ -772,6 +796,37 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
         还有一个进账是 66 块六毛六，这是我算一下每天上班的一个工资，2000 块钱平均 30 天」
         老数据没有 dir 字段 ⇒ 一律当支出（只有 r.dir === 'in' 才算收入），历史账不会被算反。 */
   var SPEND_DIR = 'out';          /* 手输时记成支出还是收入，靠上面那个切换按钮改 */
+  /* ── 记账看哪一天（他 2026-11-24 00:2x 要的：能翻到昨天/前天，往后推也行）──
+     null = 跟着今天走（每天自动是新的一天，不用记）
+     存成字符串就固定在某一天，翻走之后连"记一笔"也落在那一天 —— 补昨天的账才不会串到今天。 */
+  var SPEND_DAY = null;
+  var WD_NAME  = ['周日','周一','周二','周三','周四','周五','周六'];
+
+  function pad2(n){ return (n < 10 ? '0' : '') + n; }
+  function fmtDay(d){ return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate()); }
+  function spendDay(){ return SPEND_DAY || today(); }
+  function dayObj(s){
+    var p = String(s).split('-');
+    return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+  }
+  function dayShift(n){                       /* 前后翻 n 天 */
+    var t = dayObj(spendDay());
+    t.setDate(t.getDate() + n);
+    SPEND_DAY = fmtDay(t);
+    renderSpend();
+  }
+  /* 差值用"当天零点"算，避开时分秒和夏令时；超出口径就说人话（昨天/前天/明天） */
+  function dayDiff(a, b){ return Math.round((dayObj(a) - dayObj(b)) / 86400000); }
+  function dayLabel(day){
+    var t = today(), n = dayDiff(day, t);
+    if (n === 0)  return '今天';
+    if (n === -1) return '昨天';
+    if (n === -2) return '前天';
+    if (n === 1)  return '明天';
+    if (n === 2)  return '后天';
+    var d = dayObj(day);
+    return (d.getMonth()+1) + '月' + d.getDate() + '日';
+  }
   function r2(v){ return Math.round((Number(v) || 0) * 100) / 100; }
   function sumBy(rows, dir){
     return rows.reduce(function(a, r){
@@ -799,7 +854,7 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
       b.appendChild(n); b.appendChild(v);
       b.onclick = function(){
         var a = load(K.spend);
-        a.push({ id:uid(), day:today(), amount:amt, note:q.body || '',
+        a.push({ id:uid(), day:spendDay(), amount:amt, note:q.body || '',
                  mine:true, dir:dir, quick:(q.id || '') });
         save(K.spend, a);
         renderSpend();
@@ -808,8 +863,26 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
       box.appendChild(b);
     });
   }
+  /* 日期条：中间那行显示"今天/昨天/11月22日"，翻走之后右侧多出「今天」按钮一键回来 */
+  function renderDayBar(){
+    var d = spendDay(), lb = document.getElementById('dayLabel'),
+        back = document.getElementById('dayBack'), pick = document.getElementById('dayPick');
+    if (!lb) return;
+    var off = (d !== today());
+    lb.innerHTML = '';
+    lb.appendChild(document.createTextNode(dayLabel(d)));
+    /* 只说"昨天"不够 —— 具体是几号得看得见，补账时才知道翻到哪天 */
+    var sm = document.createElement('small');
+    var o = dayObj(d);
+    sm.textContent = (o.getMonth()+1) + '/' + o.getDate() + ' ' + WD_NAME[o.getDay()];
+    lb.appendChild(sm);
+    lb.classList.toggle('off', off);
+    if (back) back.hidden = !off;
+    if (pick) pick.value = d;
+  }
   function renderSpend(){
-    var d = today(), all = load(K.spend);
+    var d = spendDay(), all = load(K.spend);
+    renderDayBar();
     var rows = all.filter(function(r){ return r.day === d; });
     var outS = sumBy(rows, 'out'), inS = sumBy(rows, 'in');
     document.getElementById('spendTotal').textContent =
@@ -817,7 +890,7 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
 
     var ul = document.getElementById('listSpend');
     ul.innerHTML = '';
-    if (!rows.length){ ul.innerHTML = '<li class="empty">今天还没记。</li>'; }
+    if (!rows.length){ ul.innerHTML = '<li class="empty">' + dayLabel(d) + '还没记。</li>'; }
     else {
       rows.slice().reverse().forEach(function(r){
         var li = document.createElement('li');
@@ -860,6 +933,9 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
     });
     document.getElementById('spendMonth').textContent =
       '支出 ¥' + r2(mo) + (mi ? '　收入 +¥' + r2(mi) : '');
+    /* 标题跟着走 —— 翻到上个月还写"这个月"会让他看错账 */
+    var hd = document.getElementById('spendMonthHd');
+    if (hd) hd.textContent = (Number(m.slice(5,7))) + '月';
 
     var ul2 = document.getElementById('listMonth');
     ul2.innerHTML = '';
@@ -964,6 +1040,12 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
   window.__HUB_RENDER = function(){ seedAll(); render(); };
   /* 测试钩子（_test_prune.js 用）：切页签。和 __HUB_RENDER 同一类，不影响功能。 */
   window.__HUB_GOTO = function(p){ goPane(p); };
+  /* 测试钩子：把记账页拨到某一天（传 null = 回今天；不传 = 只读当前是哪天，不改）。 */
+  window.__HUB_DAY = function(){
+    if (arguments.length) SPEND_DAY = arguments[0] || null;
+    renderSpend();
+    return spendDay();
+  };
   /* 测试钩子：一次打出 7 天各要显示哪些任务（0=周日…6=周六），用来验星期条件 */
   window.__HUB_WEEK = function(){
     var rows = load(K.routine), out = {};
@@ -998,6 +1080,28 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
     c.onclick = function(){ goPane(c.dataset.go); };
   });
 
+  /* ── 记账日期条的事件（2026-11-24）─────────────────────────
+     翻走之后不动"今天"的账：renderSpend 全走 spendDay()，记一笔也落 spendDay()。
+     所以补昨天的账不会串到今天，切回今天就看到今天自己的。 */
+  (function(){
+    var pv = document.getElementById('dayPrev'), nx = document.getElementById('dayNext'),
+        lb = document.getElementById('dayLabel'), bk = document.getElementById('dayBack'),
+        pk = document.getElementById('dayPick');
+    if (pv) pv.onclick = function(){ dayShift(-1); };
+    if (nx) nx.onclick = function(){ dayShift(1); };
+    if (bk) bk.onclick = function(){ SPEND_DAY = null; renderSpend(); };
+    if (lb && pk) lb.onclick = function(){
+      /* hidden / display:none 的元素调 showPicker() 会抛 InvalidStateError ⇒ 见 CSS 注释 */
+      try { if (pk.showPicker){ pk.showPicker(); return; } } catch(e){}
+      try { pk.focus(); pk.click(); } catch(e){}
+    };
+    if (pk) pk.onchange = function(){
+      if (!pk.value) return;
+      SPEND_DAY = pk.value;      /* 已经是 yyyy-mm-dd，不用转 */
+      renderSpend();
+    };
+  })();
+
   document.getElementById('spendForm').onsubmit = function(e){
     e.preventDefault();
     var amt = parseFloat(document.getElementById('amt').value);
@@ -1007,7 +1111,7 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
     var who  = document.getElementById('who').value.trim();
     var why  = document.getElementById('why').value.trim();
     var a = load(K.spend);
-    var row = { id:uid(), day:today(), amount:Math.round(amt*100)/100, note:note,
+    var row = { id:uid(), day:spendDay(), amount:Math.round(amt*100)/100, note:note,
                 mine:mine, dir:SPEND_DIR };
     /* 只有"不是我的"才存 who/why —— 老数据没这两个字段，读的时候按 mine!==false 当"是我的"，不丢 */
     if (!mine){ row.who = who; row.why = why; }
