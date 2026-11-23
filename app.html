@@ -128,6 +128,20 @@ body.flat .wrap{padding-top:max(10px, env(safe-area-inset-top))}
 .form input::placeholder{color:var(--ink3)}
 #amt{flex:0 0 92px;text-align:right;font-variant-numeric:tabular-nums}
 #note,#backNew,#ideaNew,#routineNew{flex:1}
+/* 记账·「是不是我的支出」（他 11-21 20:18 原话：哪些是我的支出弄一个栏目打勾，
+   不是的点否，后面写是谁的、干什么） */
+.chk{display:flex;align-items:center;gap:9px;padding:0 2px 10px;cursor:pointer;
+  font-size:14.5px;color:var(--ink2);-webkit-tap-highlight-color:transparent}
+.chk input{width:19px;height:19px;accent-color:var(--rose);flex:0 0 19px;cursor:pointer}
+.forwho{display:flex;gap:8px;padding:0 0 10px}
+.forwho input{
+  flex:1;height:var(--tap);border:1px solid var(--line);border-radius:14px;
+  background:transparent;color:var(--ink);font-size:15px;padding:0 13px;
+  font-family:inherit;min-width:0
+}
+.forwho input::placeholder{color:var(--ink3)}
+/* 列表里的归属标签 */
+.who{font-size:12.5px;color:var(--ink3);margin-top:2px}
 .btn{height:var(--tap);min-width:var(--tap);padding:0 17px;border:none;border-radius:14px;background:var(--rose);color:#FFF;font-size:15px;font-family:inherit;cursor:pointer}
 .btn:active{opacity:.82}
 .btn.ghost{background:transparent;color:var(--ink2);border:1px solid var(--line)}
@@ -252,6 +266,11 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
         <input id="note" placeholder="买了什么" autocomplete="off">
         <button class="btn" type="submit">记</button>
       </form>
+      <label class="chk"><input type="checkbox" id="mineChk" checked><span>这是我的支出</span></label>
+      <div class="forwho" id="forWho" hidden>
+        <input id="who" placeholder="谁花的（妈 / 哥 / 她）" autocomplete="off">
+        <input id="why" placeholder="干什么用的" autocomplete="off">
+      </div>
       <ul class="list" id="listSpend"></ul>
     </div>
     <div class="block">
@@ -429,10 +448,36 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
   function applyRoutines(){
     var seeds = CONT.routinesSeed || [];
     if (!seeds.length) return 0;
-    var seen = readJSON(K.routineSeeded), rows = load(K.routine), added = 0;
+    var seen = readJSON(K.routineSeeded), rows = load(K.routine), added = 0, changed = false;
     for (var i = 0; i < seeds.length; i++){
       var s = seeds[i] || {}, id = s.id ? String(s.id) : '', body = s.body ? String(s.body) : '';
-      if (!id || !body || seen[id]) continue;
+      if (!id || !body) continue;
+      /* 🔴 force:true = 我改过文案、要盖掉本地那条同 id 的旧文案（只改 body，done_on 不动，
+         他今天的勾还在）。没有 force 就一律跳过 —— 保护他在 App 里手改过的内容不被我盖掉。
+         from:[旧文案...] = 老版本下发的同一条（迁移过来的 id 是 r-old-xxx、文案是旧的）。
+         先按旧文案合并，再按 id 更新文案 —— 顺序不能反，反了就匹配不到旧文案了。 */
+      if (s.force && s.from && s.from.length){
+        for (var f = 0; f < s.from.length; f++){
+          for (var k2 = rows.length - 1; k2 >= 0; k2--){
+            if (rows[k2].body !== s.from[f] || rows[k2].id === id) continue;
+            var same = null;
+            for (var k3 = 0; k3 < rows.length; k3++){ if (rows[k3].id === id){ same = rows[k3]; break; } }
+            if (same){
+              /* 已经有新 id 那条 → 旧的这条删掉，但把它的 done_on 并过去（别丢他今天的勾） */
+              if (rows[k2].done_on && !same.done_on) same.done_on = rows[k2].done_on;
+              rows.splice(k2, 1); changed = true;
+            } else {
+              rows[k2].id = id; rows[k2].body = body; changed = true;
+            }
+          }
+        }
+      }
+      if (s.force){
+        for (var k = 0; k < rows.length; k++){
+          if (rows[k].id === id && rows[k].body !== body){ rows[k].body = body; changed = true; }
+        }
+      }
+      if (seen[id]) continue;
       var dup = false;
       for (var j = 0; j < rows.length; j++){
         /* 按 id 或 body 任一相同都算重复 —— body 那半是为了接住"迁移过来的旧条目
@@ -443,7 +488,7 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
       rows.push({ id:id, body:body, done_on:null, tag:'seed', created_at:new Date().toISOString() });
       seen[id] = 1; added++;
     }
-    if (added) save(K.routine, rows);
+    if (added || changed) save(K.routine, rows);
     try { localStorage.setItem(K.routineSeeded, JSON.stringify(seen)); } catch(e){}
     return added;
   }
@@ -637,14 +682,27 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
       rows.slice().reverse().forEach(function(r){
         var li = document.createElement('li');
         li.className = 'row';
+        var wrap = document.createElement('div');
+        wrap.className = 'body'; wrap.style.flex = '1';
         var t = document.createElement('div');
-        t.className = 'body'; t.style.fontSize = '15.5px'; t.textContent = r.note || '（没写）';
+        t.style.fontSize = '15.5px'; t.textContent = r.note || '（没写）';
+        wrap.appendChild(t);
+        /* 「不是我的」标出来 —— 老数据没有 mine 字段 ⇒ 当"是我的"，不显示标签 */
+        if (r.mine === false){
+          var w = document.createElement('div');
+          w.className = 'who';
+          var bits = ['不是我的'];
+          if (r.who) bits.push(r.who);
+          if (r.why) bits.push(r.why);
+          w.textContent = bits.join(' · ');
+          wrap.appendChild(w);
+        }
         var a = document.createElement('span');
         a.className = 'amt'; a.textContent = '¥' + (Math.round((Number(r.amount)||0)*100)/100);
         var x = document.createElement('button');
         x.className = 'erase'; x.type = 'button'; x.textContent = '删';
         x.onclick = function(){ delRow(K.spend, r.id); };
-        li.appendChild(t); li.appendChild(a); li.appendChild(x);
+        li.appendChild(wrap); li.appendChild(a); li.appendChild(x);
         ul.appendChild(li);
       });
     }
@@ -782,11 +840,23 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
     var amt = parseFloat(document.getElementById('amt').value);
     var note = document.getElementById('note').value.trim();
     if (!amt || amt <= 0){ document.getElementById('amt').focus(); return; }
+    var mine = document.getElementById('mineChk').checked;
+    var who  = document.getElementById('who').value.trim();
+    var why  = document.getElementById('why').value.trim();
     var a = load(K.spend);
-    a.push({ id:uid(), day:today(), amount:Math.round(amt*100)/100, note:note });
+    var row = { id:uid(), day:today(), amount:Math.round(amt*100)/100, note:note, mine:mine };
+    /* 只有"不是我的"才存 who/why —— 老数据没这两个字段，读的时候按 mine!==false 当"是我的"，不丢 */
+    if (!mine){ row.who = who; row.why = why; }
+    a.push(row);
     save(K.spend, a);
     document.getElementById('amt').value = ''; document.getElementById('note').value = '';
+    document.getElementById('who').value = ''; document.getElementById('why').value = '';
+    document.getElementById('mineChk').checked = true;
+    document.getElementById('forWho').hidden = true;
     renderSpend();
+  };
+  document.getElementById('mineChk').onchange = function(){
+    document.getElementById('forWho').hidden = this.checked;
   };
   document.getElementById('routineForm').onsubmit = function(e){
     e.preventDefault();
