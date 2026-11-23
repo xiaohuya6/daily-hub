@@ -105,6 +105,15 @@ body.flat .wrap{padding-top:max(10px, env(safe-area-inset-top))}
 .amt{font-variant-numeric:tabular-nums;font-size:15.5px;white-space:nowrap;color:var(--ink)}
 .erase{border:none;background:none;color:var(--ink3);font-size:13px;padding:6px 0 6px 8px;cursor:pointer}
 .empty{color:var(--ink3);font-size:14px;padding:14px 0 16px}
+/* 每日任务的分段标题（上午 / 下午 / 晚上 / 随时）—— 他 2026-11-23 要分时段 */
+.grp{
+  list-style:none;display:flex;align-items:baseline;gap:7px;
+  font-size:12.5px;color:var(--ink3);letter-spacing:.05em;
+  padding:16px 0 2px;margin-top:4px;border-top:1px solid var(--line)
+}
+.grp:first-child{border-top:none;margin-top:0;padding-top:2px}
+.grp b{font-weight:600;color:var(--ink2);font-size:12.5px;letter-spacing:0}
+.grp i{font-style:normal;font-size:11.5px;color:var(--ink3)}
 /* 长想法先收三行，点一下看全（他那两条几百字，全展开会把页面撑成一条） */
 .clamp{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 
@@ -566,7 +575,9 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
 
   /* ── 今天（总览：三块各一张卡，点进去就到对应页） ── */
   function renderToday(){
-    var d = today(), notes = load(K.notes), rot = load(K.routine), spends = load(K.spend);
+    /* rot 用 routineToday 过滤过 —— 周末不该出现「加业务员」，今天页的分母也要跟着变，
+       否则会显示「0/10」而实际只该有 5 件，看着永远做不完（2026-11-23 加） */
+    var d = today(), notes = load(K.notes), rot = routineToday(load(K.routine)), spends = load(K.spend);
 
     var now = new Date();
     document.getElementById('dateline').textContent =
@@ -641,46 +652,86 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
   /* ── 每日任务 ──
      每天要做的同一批事。完成状态记在 done_on（哪一天勾的），
      今天日期一变，done_on 自然不等于今天 ⇒ 自动归零，不需要任何定时器。 */
+  /* ── 「今天该做哪些」：时段 + 星期条件（2026-11-23 14:09 他要的）────
+     他原话：「每日任务分成上午下午 还有比如说加人是只有工作日加人 所以工作日会有加业务员
+              周末就没有这个任务 还有修指甲是周日的 那就只有周日才会出现这个任务」
+     条件写在 content.js 的 routinesSeed（slot / dow），**不写进本地库** ——
+     所以以后改规则只动 content，他手机上那条不用删了重建，勾选记录也不会丢。 */
+  var SLOT_NAME  = { am:'上午', pm:'下午', night:'晚上', noon:'随时' };
+  var SLOT_ORDER = ['am', 'pm', 'night', 'noon'];
+  function seedMeta(id){
+    var seeds = CONT.routinesSeed || [];
+    for (var i = 0; i < seeds.length; i++){
+      if (seeds[i] && seeds[i].id === id) return seeds[i];
+    }
+    return null;
+  }
+  function slotOf(s){ return (s && s.slot && SLOT_NAME[s.slot]) ? s.slot : 'noon'; }
+  function showOn(s, day){
+    if (!s || !s.dow) return true;                 /* 没写 dow = 每天都出 */
+    var dw = s.dow;
+    if (typeof dw === 'string') dw = dw.split(',');
+    for (var i = 0; i < dw.length; i++){ if (Number(dw[i]) === day) return true; }
+    return false;
+  }
+  /* 今天该显示的任务（按 routinesSeed 顺序排好）
+     day 可以显式传（0=周日…6=周六）—— 测试要一次看七天的结果，不传就用今天的。
+     🔴 他自己加的条目没有 seed ⇒ 每天都出、永不被条件藏掉（不能因为漏配字段就看不见） */
+  function routineToday(rows, day){
+    if (typeof day !== 'number') day = new Date().getDay();
+    var order = {}, seeds = CONT.routinesSeed || [];
+    for (var i = 0; i < seeds.length; i++){ if (seeds[i] && seeds[i].id) order[seeds[i].id] = i; }
+    return rows.filter(function(r){
+      var s = seedMeta(r.id);
+      return s ? showOn(s, day) : true;
+    }).sort(function(a, b){
+      var ia = (a.id in order) ? order[a.id] : 9999;
+      var ib = (b.id in order) ? order[b.id] : 9999;
+      return ia - ib;
+    });
+  }
+
   function renderRoutine(){
-    var d = today(), rows = load(K.routine);
+    var d = today(), rows = routineToday(load(K.routine));
     var doneN = rows.filter(function(r){ return r.done_on === d; }).length;
     document.getElementById('cntRoutine').textContent = doneN + '/' + rows.length;
     var ul = document.getElementById('listRoutine');
     ul.innerHTML = '';
     if (!rows.length){
-      ul.innerHTML = '<li class="empty">还没有每天要做的事。下面加一条。</li>';
+      ul.innerHTML = '<li class="empty">今天没有要做的事。下面加一条。</li>';
       return;
     }
-    /* 排序：以 routinesSeed 的数组顺序为准（工作线在前、生活线次之、副业最后）。
-       为什么不在云端改数组顺序：本地已存的那批不会因为云端重排而变序，
-       只有渲染时按 seed 排才对他手机上已有的数据也生效。
-       seed 里没有的（他自己加的、或删剩的旧条目）排最后，不丢。 */
-    var order = {}, seeds = (CONT.routinesSeed || []);
-    for (var si = 0; si < seeds.length; si++){ if (seeds[si] && seeds[si].id) order[seeds[si].id] = si; }
-    rows = rows.slice().sort(function(a, b){
-      var ia = (a.id in order) ? order[a.id] : 9999;
-      var ib = (b.id in order) ? order[b.id] : 9999;
-      return ia - ib;
-    });
-    rows.forEach(function(r){
-      var on = (r.done_on === d);
-      var li = document.createElement('li');
-      li.className = 'row' + (on ? ' done' : '');
-      var b = document.createElement('button');
-      b.className = 'tick'; b.type = 'button';
-      b.setAttribute('aria-label', on ? '标记为没做完' : '标记为做完');
-      b.onclick = function(){ toggleRoutine(r.id); };
-      var t = document.createElement('div');
-      t.className = 'body'; t.textContent = r.body;
-      var x = document.createElement('button');
-      x.className = 'erase'; x.type = 'button'; x.textContent = '删';
-      x.onclick = function(){
-        save(K.routine, load(K.routine).filter(function(y){ return y.id !== r.id; }));
-        renderRoutine();
-        if (pane === 'today') renderToday();
-      };
-      li.appendChild(b); li.appendChild(t); li.appendChild(x);
-      ul.appendChild(li);
+    /* 按时段分组；空组连标题都不画（周末那半天只剩生活线，也不会留个空壳） */
+    var groups = { am:[], pm:[], night:[], noon:[] };
+    rows.forEach(function(r){ groups[slotOf(seedMeta(r.id))].push(r); });
+    SLOT_ORDER.forEach(function(k){
+      if (!groups[k].length) return;
+      var hd = document.createElement('li');
+      hd.className = 'grp';
+      var nb = document.createElement('b'); nb.textContent = SLOT_NAME[k];
+      var ni = document.createElement('i'); ni.textContent = groups[k].length + ' 件';
+      hd.appendChild(nb); hd.appendChild(ni);
+      ul.appendChild(hd);
+      groups[k].forEach(function(r){
+        var on = (r.done_on === d);
+        var li = document.createElement('li');
+        li.className = 'row' + (on ? ' done' : '');
+        var tb = document.createElement('button');
+        tb.className = 'tick'; tb.type = 'button';
+        tb.setAttribute('aria-label', on ? '标记为没做完' : '标记为做完');
+        tb.onclick = function(){ toggleRoutine(r.id); };
+        var t = document.createElement('div');
+        t.className = 'body'; t.textContent = r.body;
+        var x = document.createElement('button');
+        x.className = 'erase'; x.type = 'button'; x.textContent = '删';
+        x.onclick = function(){
+          save(K.routine, load(K.routine).filter(function(y){ return y.id !== r.id; }));
+          renderRoutine();
+          if (pane === 'today') renderToday();
+        };
+        li.appendChild(tb); li.appendChild(t); li.appendChild(x);
+        ul.appendChild(li);
+      });
     });
   }
   function toggleRoutine(id){
@@ -913,6 +964,17 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
   window.__HUB_RENDER = function(){ seedAll(); render(); };
   /* 测试钩子（_test_prune.js 用）：切页签。和 __HUB_RENDER 同一类，不影响功能。 */
   window.__HUB_GOTO = function(p){ goPane(p); };
+  /* 测试钩子：一次打出 7 天各要显示哪些任务（0=周日…6=周六），用来验星期条件 */
+  window.__HUB_WEEK = function(){
+    var rows = load(K.routine), out = {};
+    for (var i = 0; i < 7; i++){
+      out[i] = routineToday(rows, i).map(function(r){
+        var s = seedMeta(r.id);
+        return { id: r.id, slot: (s ? slotOf(s) : 'noon'), body: String(r.body).slice(0, 18) };
+      });
+    }
+    return out;
+  };
   window.__HUB_APPLY_CONTENT = function(c){
     if (!c) return;
     /* 云端版本比手上旧 → 忽略（防止旧备份把新内容盖回去，比如擦除指令被回滚） */
