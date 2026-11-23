@@ -289,6 +289,7 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
 </nav>
 
 <script src="hub-sync.js"></script>
+<script src="content.js"></script>
 <script>
 (function () {
   'use strict';
@@ -365,6 +366,53 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
       kept.filter(function(n){ return n.kind==='backlog'; }).length); } catch(e){}
     return true;
   }
+  /* ── 旧「每日例行」数据迁移（2026-11-23 加）──────────────────────
+     老 desktop.html 往 v2-routines 里塞了 308 条，实际只有 8 个主题
+     （前 5 个各重复了 61 遍 —— 跟待办 539 条完全同一个病：按 body 判重，改文案就重灌）。
+     旧结构是 {id:数字, body, dow, active}，没有 done_on ⇒ 新界面的勾选逻辑认不出来。
+     做法：按 body 去重 → 用 routinesSeed 的 id 重建 → 老的其余条目补在后面（一条不丢）。
+     幂等：迁完所有条目都有 done_on 字段，再跑不会二次触发。 */
+  function h32(s){
+    var h = 0;
+    for (var i = 0; i < s.length; i++){ h = (h * 31 + s.charCodeAt(i)) | 0; }
+    return (h >>> 0).toString(36);
+  }
+  function migrateRoutine(){
+    var rows = load(K.routine);
+    if (!rows.length) return 0;
+    function isOld(r){ return !r || typeof r.done_on === 'undefined'; }
+    if (!rows.some(isOld)) return 0;
+
+    var oldUniq = [], seenBody = {};
+    rows.forEach(function(r){
+      if (!isOld(r) || !r.body || r.active === false) return;
+      if (seenBody[r.body]) return;
+      seenBody[r.body] = 1; oldUniq.push(r);
+    });
+
+    var out = [], haveId = {}, haveBody = {};
+    function put(o){
+      if (!o.id || !o.body || haveId[o.id] || haveBody[o.body]) return;
+      haveId[o.id] = 1; haveBody[o.body] = 1; out.push(o);
+    }
+    (CONT.routinesSeed || []).forEach(function(s){
+      put({ id:s.id, body:s.body, done_on:null, tag:'seed', created_at:new Date().toISOString() });
+    });
+    oldUniq.forEach(function(r){
+      put({ id:'r-old-' + h32(r.body), body:r.body, done_on:null, tag:'migrated',
+            created_at:r.created_at || new Date().toISOString() });
+    });
+    rows.forEach(function(r){                 /* 新结构里他自己加的，原样留下 */
+      if (isOld(r)) return;
+      put(r);
+    });
+
+    save(K.routine, out);
+    try { localStorage.setItem(K.routineSeeded, '{}'); } catch(e){}
+    try { console.log('[hub] 每日任务迁移：' + rows.length + ' 条 → ' + out.length + ' 条'); } catch(e){}
+    return out.length;
+  }
+
   /* ── 每日任务：云端下发默认项，按 id 去重（幂等）──────────────────
      为什么按 id 不按 body：老 applySeeds 按 body 全文判重，我一改文案就算新的一条，
      把待办灌成 539 条（错误清单 E170）。改成 id 后，同一个 id 永远只加一次。 */
@@ -377,7 +425,11 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
       var s = seeds[i] || {}, id = s.id ? String(s.id) : '', body = s.body ? String(s.body) : '';
       if (!id || !body || seen[id]) continue;
       var dup = false;
-      for (var j = 0; j < rows.length; j++){ if (rows[j].id === id){ dup = true; break; } }
+      for (var j = 0; j < rows.length; j++){
+        /* 按 id 或 body 任一相同都算重复 —— body 那半是为了接住"迁移过来的旧条目
+           （id 是 r-old-xxx，body 跟 seed 一样）"，不然会同一件事出现两条 */
+        if (rows[j].id === id || rows[j].body === body){ dup = true; break; }
+      }
       if (dup){ seen[id] = 1; continue; }
       rows.push({ id:id, body:body, done_on:null, tag:'seed', created_at:new Date().toISOString() });
       seen[id] = 1; added++;
@@ -409,7 +461,7 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
     try { localStorage.setItem(K.pushSeen, JSON.stringify(seen)); } catch(e){}
     return added;
   }
-  function seedAll(){ applyPrune(); applySeeds(); applyRoutines(); applyPush(); }
+  function seedAll(){ applyPrune(); applySeeds(); migrateRoutine(); applyRoutines(); applyPush(); }
 
   /* ── 今天（总览：三块各一张卡，点进去就到对应页） ── */
   function renderToday(){
