@@ -829,17 +829,6 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
   if ('serviceWorker' in navigator){
     window.addEventListener('load', function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); });
   }
-  /* TEMP-DEBUG 超宽元素测量（测完删） */
-  setTimeout(function(){
-    try {
-      var w = document.documentElement.clientWidth, list = [];
-      document.querySelectorAll('body *').forEach(function(el){
-        var r = el.getBoundingClientRect();
-        if (r.right > w + 0.5) list.push(el.tagName + (el.className ? '.' + String(el.className).split(' ')[0] : '') + '@' + Math.round(r.right) + 'w' + Math.round(r.width));
-      });
-      document.title = 'VW' + w + '|SW' + document.body.scrollWidth + '|' + list.slice(0, 10).join(' ');
-    } catch(e){ document.title = 'ERR ' + e.message; }
-  }, 1200);
 })();
 </script>
 </body>
