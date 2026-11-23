@@ -118,10 +118,22 @@ body{
 }
 .form input::placeholder{color:var(--ink3)}
 #amt{flex:0 0 92px;text-align:right;font-variant-numeric:tabular-nums}
-#note,#backNew,#ideaNew{flex:1}
+#note,#backNew,#ideaNew,#routineNew{flex:1}
 .btn{height:var(--tap);min-width:var(--tap);padding:0 17px;border:none;border-radius:14px;background:var(--rose);color:#FFF;font-size:15px;font-family:inherit;cursor:pointer}
 .btn:active{opacity:.82}
 .btn.ghost{background:transparent;color:var(--ink2);border:1px solid var(--line)}
+
+/* ── 今天：三张汇总卡 ── */
+.cards{display:grid;gap:10px;padding:2px 0 4px}
+.card{
+  display:flex;align-items:center;gap:14px;width:100%;min-height:66px;padding:14px 16px;
+  border:1px solid var(--line);border-radius:16px;background:var(--surface);
+  font-family:inherit;cursor:pointer;text-align:left
+}
+.card:active{opacity:.75}
+.card .big{font-size:21px;font-weight:600;color:var(--navy);font-variant-numeric:tabular-nums;min-width:68px}
+.card .tx{flex:1;font-size:14.5px;color:var(--ink2);line-height:1.45}
+.card .ar{color:var(--ink3);font-size:14px}
 
 /* ── 底部页签 ── */
 nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
@@ -161,11 +173,24 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
 <div class="wrap">
   <div class="bar"><i id="barFill" style="width:0%"></i></div>
 
-  <!-- ═══ 今天 ═══ -->
+  <!-- ═══ 今天（总览） ═══ -->
   <section id="pane-today">
     <div class="block">
-      <div class="blockhd"><span>今日任务</span><span class="v" id="cntTask">0/0</span></div>
-      <ul class="list" id="listTask"></ul>
+      <div class="blockhd"><span>今天</span><span class="v" id="todayHint"></span></div>
+      <div class="cards">
+        <button class="card" type="button" data-go="routine">
+          <span class="big" id="cardRoutine">0/0</span>
+          <span class="tx">每日任务</span><span class="ar">›</span>
+        </button>
+        <button class="card" type="button" data-go="backlog">
+          <span class="big" id="cardBacklog">0</span>
+          <span class="tx">待办没做</span><span class="ar">›</span>
+        </button>
+        <button class="card" type="button" data-go="spend">
+          <span class="big" id="cardSpend">¥0</span>
+          <span class="tx">今天花的</span><span class="ar">›</span>
+        </button>
+      </div>
     </div>
 
     <div class="block">
@@ -173,6 +198,44 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
       <div class="hearts" id="hearts"></div>
     </div>
 
+    <div class="block">
+      <div class="blockhd"><span>一句话记下来</span><span class="v" id="cntIdea"></span></div>
+      <form class="form" id="ideaForm">
+        <input id="ideaNew" placeholder="想到什么，别让它跑掉" autocomplete="off">
+        <button class="btn" type="submit">记</button>
+      </form>
+      <ul class="list" id="listIdea"></ul>
+    </div>
+  </section>
+
+  <!-- ═══ 每日任务 ═══ -->
+  <section id="pane-routine" hidden>
+    <div class="block">
+      <div class="blockhd"><span>每天都要做的</span><span class="v" id="cntRoutine">0/0</span></div>
+      <ul class="list" id="listRoutine"></ul>
+      <form class="form" id="routineForm">
+        <input id="routineNew" placeholder="加一条每天做的" autocomplete="off">
+        <button class="btn" type="submit">加</button>
+      </form>
+      <div class="note">勾上就算今天做了。第二天自动归零，不用手动清。</div>
+    </div>
+  </section>
+
+  <!-- ═══ 待办 ═══ -->
+  <section id="pane-backlog" hidden>
+    <div class="block">
+      <div class="blockhd"><span>待办 · 你说的，我记着</span><span class="v" id="cntBacklog"></span></div>
+      <form class="form" id="backForm">
+        <input id="backNew" placeholder="要办的事，一句话" autocomplete="off">
+        <button class="btn" type="submit">加</button>
+      </form>
+      <ul class="list" id="listBacklog"></ul>
+      <div class="note">这里只放你说过的事。你也可以直接跟我说一句，我给你推上来。</div>
+    </div>
+  </section>
+
+  <!-- ═══ 记账 ═══ -->
+  <section id="pane-spend" hidden>
     <div class="block">
       <div class="blockhd"><span>记一笔</span><span class="v" id="spendTotal">今天 ¥0</span></div>
       <form class="form" id="spendForm">
@@ -182,29 +245,10 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
       </form>
       <ul class="list" id="listSpend"></ul>
     </div>
-  </section>
-
-  <!-- ═══ 待办 ═══ -->
-  <section id="pane-backlog" hidden>
     <div class="block">
-      <div class="blockhd"><span>待办 · 攒着慢慢做</span><span class="v" id="cntBacklog"></span></div>
-      <form class="form" id="backForm">
-        <input id="backNew" placeholder="加一条" autocomplete="off">
-        <button class="btn" type="submit">加</button>
-      </form>
-      <ul class="list" id="listBacklog"></ul>
-    </div>
-  </section>
-
-  <!-- ═══ 想法 ═══ -->
-  <section id="pane-idea" hidden>
-    <div class="block">
-      <div class="blockhd"><span>今天想到的</span><span class="v" id="cntIdea"></span></div>
-      <form class="form" id="ideaForm">
-        <input id="ideaNew" placeholder="一句话，别让它跑掉" autocomplete="off">
-        <button class="btn" type="submit">记</button>
-      </form>
-      <ul class="list" id="listIdea"></ul>
+      <div class="blockhd"><span>这个月</span><span class="v" id="spendMonth">¥0</span></div>
+      <ul class="list" id="listMonth"></ul>
+      <div class="note">按月汇总，一行一天，点「删」清掉当天全部。</div>
     </div>
   </section>
 
@@ -237,8 +281,9 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
 <nav>
   <div class="tabs">
     <button class="tab on" data-pane="today">今天</button>
+    <button class="tab" data-pane="routine">每日任务</button>
     <button class="tab" data-pane="backlog">待办</button>
-    <button class="tab" data-pane="idea">想法</button>
+    <button class="tab" data-pane="spend">记账</button>
     <button class="tab" data-pane="more">更多</button>
   </div>
 </nav>
@@ -248,7 +293,8 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
 (function () {
   'use strict';
   var PASS = '我爱凌波';            /* 只用于解密云端备份，不做界面门槛（红线 #125） */
-  var K = { notes:'v2-notes', spend:'v2-spend', content:'v2-content', seeded:'app-seeded', pruned:'app-pruned' };
+  var K = { notes:'v2-notes', spend:'v2-spend', routine:'v2-routines', content:'v2-content',
+            seeded:'app-seeded', pruned:'app-pruned', pushSeen:'app-push-seen', routineSeeded:'app-routine-seeded' };
   var CONT = {}, pane = 'today', SYNCING = true;
 
   function load(k){ try { var a = JSON.parse(localStorage.getItem(k) || '[]'); return Array.isArray(a) ? a : []; } catch(e){ return []; } }
@@ -296,10 +342,13 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
     for (var d = 0; d < dropArr.length; d++) dropSet[dropArr[d]] = 1;
     before = notes.filter(function(n){ return n.kind === 'backlog'; }).length;
     kept = notes.filter(function(n){
-      if (n.kind !== 'backlog') return true;      /* 今日任务 / 想法 / 账 一律不动 */
+      /* 🔴 我下发的「今日任务」一次性的那条也全清 —— 他 11-23 原话
+         「待办就是我跟你说的事情…而不是说是你来帮我制定代办清单」 */
+      if (n.kind === 'task' && n.tag === 'seed') return false;
+      if (n.kind !== 'backlog') return true;      /* 想法 / 账 / 他自己加的 一律不动 */
       if (dropSet[n.body]) return false;          /* 点名删：不看 tag，说删就删 */
       if (n.tag !== 'seed') return true;          /* 其余他自己手打的一条不动 */
-      return !!keepSet[n.body];                   /* 白名单里原样保留 */
+      return !!keepSet[n.body];                   /* 白名单里原样保留（现为 [] = 全清） */
     });
     var have = {};
     for (var j = 0; j < kept.length; j++){ if (kept[j].kind === 'backlog') have[kept[j].body] = 1; }
@@ -316,46 +365,103 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
       kept.filter(function(n){ return n.kind==='backlog'; }).length); } catch(e){}
     return true;
   }
-  function seedAll(){ applyPrune(); applySeeds(); }
+  /* ── 每日任务：云端下发默认项，按 id 去重（幂等）──────────────────
+     为什么按 id 不按 body：老 applySeeds 按 body 全文判重，我一改文案就算新的一条，
+     把待办灌成 539 条（错误清单 E170）。改成 id 后，同一个 id 永远只加一次。 */
+  function readJSON(k){ try { return JSON.parse(localStorage.getItem(k) || '{}') || {}; } catch(e){ return {}; } }
+  function applyRoutines(){
+    var seeds = CONT.routinesSeed || [];
+    if (!seeds.length) return 0;
+    var seen = readJSON(K.routineSeeded), rows = load(K.routine), added = 0;
+    for (var i = 0; i < seeds.length; i++){
+      var s = seeds[i] || {}, id = s.id ? String(s.id) : '', body = s.body ? String(s.body) : '';
+      if (!id || !body || seen[id]) continue;
+      var dup = false;
+      for (var j = 0; j < rows.length; j++){ if (rows[j].id === id){ dup = true; break; } }
+      if (dup){ seen[id] = 1; continue; }
+      rows.push({ id:id, body:body, done_on:null, tag:'seed', created_at:new Date().toISOString() });
+      seen[id] = 1; added++;
+    }
+    if (added) save(K.routine, rows);
+    try { localStorage.setItem(K.routineSeeded, JSON.stringify(seen)); } catch(e){}
+    return added;
+  }
 
-  /* ── 今天 ── */
+  /* ── 我推给他的待办 / 任务：按 id 幂等，永不重复堆积 ──────────────
+     🔴 以后他跟我说「记一条待办」，我就在 content.js 的 pushItems 里加
+        {id:'p20261123a', kind:'backlog', body:'…'}，升 version，发布。同一个 id 只加一次。 */
+  function applyPush(){
+    var items = CONT.pushItems || [];
+    if (!items.length) return 0;
+    var seen = readJSON(K.pushSeen), notes = load(K.notes), added = 0;
+    for (var i = 0; i < items.length; i++){
+      var it = items[i] || {}, id = it.id ? String(it.id) : '', body = it.body ? String(it.body) : '';
+      if (!id || !body || seen[id]) continue;
+      var dup = false;
+      for (var j = 0; j < notes.length; j++){ if (notes[j].id === id){ dup = true; break; } }
+      if (dup){ seen[id] = 1; continue; }
+      var kind = (it.kind === 'task') ? 'task' : 'backlog';
+      notes.push({ id:id, day: kind === 'task' ? today() : 'backlog', kind:kind, body:body,
+                   done:false, tag:'push', created_at:new Date().toISOString() });
+      seen[id] = 1; added++;
+    }
+    if (added) save(K.notes, notes);
+    try { localStorage.setItem(K.pushSeen, JSON.stringify(seen)); } catch(e){}
+    return added;
+  }
+  function seedAll(){ applyPrune(); applySeeds(); applyRoutines(); applyPush(); }
+
+  /* ── 今天（总览：三块各一张卡，点进去就到对应页） ── */
   function renderToday(){
-    var d = today(), notes = load(K.notes);
-    var tasks = notes.filter(function(n){ return n.kind==='task' && n.day===d; });
-    var doneN = tasks.filter(function(n){ return n.done===true; }).length;
+    var d = today(), notes = load(K.notes), rot = load(K.routine), spends = load(K.spend);
 
     var now = new Date();
     document.getElementById('dateline').textContent =
       now.getFullYear() + ' · ' + (now.getMonth()+1) + '月' + now.getDate() + '日 ' +
       ['周日','周一','周二','周三','周四','周五','周六'][now.getDay()];
 
+    var rDone = 0, rLeft = 0;
+    rot.forEach(function(r){ if (r.done_on === d) rDone++; else rLeft++; });
+    var bkOpen = notes.filter(function(n){ return n.kind==='backlog' && !n.done; }).length;
+    var bkDone = notes.filter(function(n){ return n.kind==='backlog' && n.done; }).length;
+    var sum = spends.filter(function(r){ return r.day === d; })
+                    .reduce(function(a,r){ return a + (Number(r.amount)||0); }, 0);
+
+    document.getElementById('cardRoutine').textContent = rDone + '/' + rot.length;
+    document.getElementById('cardBacklog').textContent = bkOpen + ' 条';
+    document.getElementById('cardSpend').textContent = '¥' + (Math.round(sum*100)/100);
+
+    var totalLeft = rLeft + bkOpen;
+    document.getElementById('todayHint').textContent = totalLeft ? totalLeft + ' 件没做' : '都清了';
+
     var sub, line;
-    if (!tasks.length && SYNCING) {
+    if (!rot.length && !bkOpen && SYNCING){
       sub = '正在读今天的安排';
       line = '等我一下，我在读今天的安排…';
-    } else if (!tasks.length) {
-      sub = '今天还没排任务';
-      line = '今天还没有要做的事。想加什么，说一句给我，我推上来。';
-    } else if (doneN === tasks.length) {
-      sub = tasks.length + ' 件全做完了';
-      line = '<b>全都做完了。</b>今天到这里就可以，剩下的时间是你的。';
+    } else if (totalLeft === 0){
+      sub = rot.length ? '今天都清了' : '还没有每天要做的事';
+      line = rot.length
+        ? '<b>都做完了。</b>今天到这里就可以，剩下的时间是你的。'
+        : '每天要做的事还是空的。想加什么，到「每日任务」里写一条，或者跟我说一声。';
+    } else if (rLeft > 0 && bkOpen > 0){
+      sub = rLeft + ' 件每天要做的 · ' + bkOpen + ' 条待办';
+      line = '每天那 <b>' + rLeft + ' 件</b>先做，剩下的时间再挑一条待办。别一次全干。';
+    } else if (rLeft > 0){
+      sub = rLeft + ' 件每天要做的没勾';
+      line = '还有 <b>' + rLeft + ' 件</b>每天要做的没勾。两分钟的活，现在顺手做掉。';
     } else {
-      sub = tasks.length + ' 件，做完 ' + doneN + ' 件';
-      line = '今天还有 <b>' + (tasks.length - doneN) + ' 件</b>没做完。不用一次做完，先挑一件两分钟能搞定的。';
+      sub = bkOpen + ' 条待办攒着';
+      line = '每天的做完了。待办里还有 <b>' + bkOpen + ' 条</b>，想动就挑一条。';
     }
     document.getElementById('heroSub').textContent = sub;
     document.getElementById('talkLine').innerHTML = line;
-    document.getElementById('cntTask').textContent = doneN + '/' + tasks.length;
-    document.getElementById('barFill').style.width =
-      (tasks.length ? Math.round(doneN * 100 / tasks.length) : 0) + '%';
 
-    var ul = document.getElementById('listTask');
-    ul.innerHTML = '';
-    if (!tasks.length) ul.innerHTML = '<li class="empty">空的，也是好事。</li>';
-    tasks.forEach(function(n){ ul.appendChild(rowEl(n)); });
+    var all = rot.length + bkDone + bkOpen;
+    document.getElementById('barFill').style.width =
+      (all ? Math.round((rDone + bkDone) * 100 / all) : 0) + '%';
 
     renderWater();
-    renderSpend();
+    renderIdea();
   }
 
   function rowEl(n){
@@ -377,6 +483,49 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
     }
     save(K.notes, notes);
     render();
+  }
+
+  /* ── 每日任务 ──
+     每天要做的同一批事。完成状态记在 done_on（哪一天勾的），
+     今天日期一变，done_on 自然不等于今天 ⇒ 自动归零，不需要任何定时器。 */
+  function renderRoutine(){
+    var d = today(), rows = load(K.routine);
+    var doneN = rows.filter(function(r){ return r.done_on === d; }).length;
+    document.getElementById('cntRoutine').textContent = doneN + '/' + rows.length;
+    var ul = document.getElementById('listRoutine');
+    ul.innerHTML = '';
+    if (!rows.length){
+      ul.innerHTML = '<li class="empty">还没有每天要做的事。下面加一条。</li>';
+      return;
+    }
+    rows.forEach(function(r){
+      var on = (r.done_on === d);
+      var li = document.createElement('li');
+      li.className = 'row' + (on ? ' done' : '');
+      var b = document.createElement('button');
+      b.className = 'tick'; b.type = 'button';
+      b.setAttribute('aria-label', on ? '标记为没做完' : '标记为做完');
+      b.onclick = function(){ toggleRoutine(r.id); };
+      var t = document.createElement('div');
+      t.className = 'body'; t.textContent = r.body;
+      var x = document.createElement('button');
+      x.className = 'erase'; x.type = 'button'; x.textContent = '删';
+      x.onclick = function(){
+        save(K.routine, load(K.routine).filter(function(y){ return y.id !== r.id; }));
+        renderRoutine();
+        if (pane === 'today') renderToday();
+      };
+      li.appendChild(b); li.appendChild(t); li.appendChild(x);
+      ul.appendChild(li);
+    });
+  }
+  function toggleRoutine(id){
+    var d = today(), rows = load(K.routine);
+    for (var i=0;i<rows.length;i++){
+      if (rows[i].id === id){ rows[i].done_on = (rows[i].done_on === d) ? null : d; break; }
+    }
+    save(K.routine, rows);
+    renderRoutine();
   }
 
   /* ── 喝水 ── */
@@ -404,26 +553,61 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
 
   /* ── 记账 ── */
   function renderSpend(){
-    var d = today();
-    var rows = load(K.spend).filter(function(r){ return r.day === d; });
+    var d = today(), all = load(K.spend);
+    var rows = all.filter(function(r){ return r.day === d; });
     var sum = rows.reduce(function(a, r){ return a + (Number(r.amount) || 0); }, 0);
     document.getElementById('spendTotal').textContent = '今天 ¥' + (Math.round(sum*100)/100);
+
     var ul = document.getElementById('listSpend');
     ul.innerHTML = '';
-    if (!rows.length){ ul.innerHTML = '<li class="empty">今天还没记。</li>'; return; }
-    rows.slice().reverse().forEach(function(r){
+    if (!rows.length){ ul.innerHTML = '<li class="empty">今天还没记。</li>'; }
+    else {
+      rows.slice().reverse().forEach(function(r){
+        var li = document.createElement('li');
+        li.className = 'row';
+        var t = document.createElement('div');
+        t.className = 'body'; t.style.fontSize = '15.5px'; t.textContent = r.note || '（没写）';
+        var a = document.createElement('span');
+        a.className = 'amt'; a.textContent = '¥' + (Math.round((Number(r.amount)||0)*100)/100);
+        var x = document.createElement('button');
+        x.className = 'erase'; x.type = 'button'; x.textContent = '删';
+        x.onclick = function(){ delRow(K.spend, r.id); };
+        li.appendChild(t); li.appendChild(a); li.appendChild(x);
+        ul.appendChild(li);
+      });
+    }
+
+    /* 本月：按天汇总，一行一天 */
+    var m = d.slice(0, 7), mt = 0, byDay = {};
+    all.forEach(function(r){
+      if (!r.day || r.day.slice(0, 7) !== m) return;
+      var v = Number(r.amount) || 0;
+      mt += v; byDay[r.day] = (byDay[r.day] || 0) + v;
+    });
+    document.getElementById('spendMonth').textContent = '¥' + (Math.round(mt*100)/100);
+
+    var ul2 = document.getElementById('listMonth');
+    ul2.innerHTML = '';
+    var days = Object.keys(byDay).sort().reverse();
+    if (!days.length){ ul2.innerHTML = '<li class="empty">这个月还没记。</li>'; return; }
+    days.forEach(function(dd){
       var li = document.createElement('li');
       li.className = 'row';
       var t = document.createElement('div');
-      t.className = 'body'; t.style.fontSize = '15.5px'; t.textContent = r.note || '（没写）';
+      t.className = 'body'; t.style.fontSize = '15.5px';
+      t.textContent = dd.slice(5).replace('-', '/') + (dd === d ? '　今天' : '');
       var a = document.createElement('span');
-      a.className = 'amt'; a.textContent = '¥' + (Math.round((Number(r.amount)||0)*100)/100);
+      a.className = 'amt'; a.textContent = '¥' + (Math.round(byDay[dd]*100)/100);
       var x = document.createElement('button');
       x.className = 'erase'; x.type = 'button'; x.textContent = '删';
-      x.onclick = function(){ delRow(K.spend, r.id); };
+      x.onclick = function(){ clearDay(dd); };
       li.appendChild(t); li.appendChild(a); li.appendChild(x);
-      ul.appendChild(li);
+      ul2.appendChild(li);
     });
+  }
+  function clearDay(day){
+    save(K.spend, load(K.spend).filter(function(r){ return r.day !== day; }));
+    render();
   }
   function delRow(key, id){ save(key, load(key).filter(function(r){ return r.id !== id; })); render(); }
 
@@ -443,14 +627,16 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
     });
   }
 
-  /* ── 想法 ── */
+  /* ── 想法（今天的标出来，旧的不丢，最多留 20 条） ── */
   function renderIdea(){
     var d = today();
-    var rows = load(K.notes).filter(function(n){ return n.kind === 'idea' && n.day === d; });
-    document.getElementById('cntIdea').textContent = rows.length + ' 条';
+    var all = load(K.notes).filter(function(n){ return n.kind === 'idea'; });
+    var todayN = all.filter(function(n){ return n.day === d; }).length;
+    document.getElementById('cntIdea').textContent = todayN ? todayN + ' 条今天' : '';
     var ul = document.getElementById('listIdea'); ul.innerHTML = '';
-    if (!rows.length){ ul.innerHTML = '<li class="empty">今天还没有想法。</li>'; return; }
-    rows.slice().reverse().forEach(function(n){
+    var rows = all.slice(-20);
+    if (!rows.length){ ul.innerHTML = '<li class="empty">还没有想法。</li>'; return; }
+    rows.reverse().forEach(function(n){
       var li = document.createElement('li');
       li.className = 'row';
       var t = document.createElement('div');
@@ -480,25 +666,33 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
     document.querySelectorAll('section').forEach(function(s){ s.hidden = (s.id !== 'pane-' + pane); });
     document.querySelectorAll('.tab').forEach(function(b){ b.classList.toggle('on', b.dataset.pane === pane); });
     if (pane === 'today') renderToday();
+    else if (pane === 'routine') renderRoutine();
     else if (pane === 'backlog') renderBacklog();
-    else if (pane === 'idea') renderIdea();
+    else if (pane === 'spend') renderSpend();
     else renderMore();
   }
   window.__HUB_RENDER = function(){ seedAll(); render(); };
   window.__HUB_APPLY_CONTENT = function(c){
     if (!c) return;
+    /* 云端版本比手上旧 → 忽略（防止旧备份把新内容盖回去，比如擦除指令被回滚） */
+    if (CONT && CONT.version && c.version && c.version < CONT.version) return;
     CONT = c; SYNCING = false;
     try { localStorage.setItem(K.content, JSON.stringify(c)); } catch(e){}
     seedAll();
-    if (pane === 'today') renderToday();
+    render();
   };
 
+  /* 页签切换（「今天」页三张卡片也走这里跳） */
+  function goPane(p){
+    pane = p;
+    try { localStorage.setItem('app-pane', pane); } catch(e){}
+    render(); window.scrollTo(0,0);
+  }
   document.querySelectorAll('.tab').forEach(function(b){
-    b.onclick = function(){
-      pane = b.dataset.pane;
-      try { localStorage.setItem('app-pane', pane); } catch(e){}
-      render(); window.scrollTo(0,0);
-    };
+    b.onclick = function(){ goPane(b.dataset.pane); };
+  });
+  document.querySelectorAll('.card').forEach(function(c){
+    c.onclick = function(){ goPane(c.dataset.go); };
   });
 
   document.getElementById('spendForm').onsubmit = function(e){
@@ -511,6 +705,15 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
     save(K.spend, a);
     document.getElementById('amt').value = ''; document.getElementById('note').value = '';
     renderSpend();
+  };
+  document.getElementById('routineForm').onsubmit = function(e){
+    e.preventDefault();
+    var v = document.getElementById('routineNew').value.trim(); if (!v) return;
+    var a = load(K.routine);
+    a.push({ id:uid(), body:v, done_on:null, tag:null, created_at:new Date().toISOString() });
+    save(K.routine, a);
+    document.getElementById('routineNew').value = '';
+    renderRoutine();
   };
   document.getElementById('backForm').onsubmit = function(e){
     e.preventDefault();
@@ -530,12 +733,19 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
     try { window.HUBSYNC.exportLocal(); } catch(e){ alert('导出失败：' + e); }
   };
 
-  try { CONT = JSON.parse(localStorage.getItem(K.content) || 'null') || window.CONTENT || {}; }
-  catch(e){ CONT = window.CONTENT || {}; }
-  try { var p = localStorage.getItem('app-pane'); if (p) pane = p; } catch(e){}
+  var PANES = ['today','routine','backlog','spend','more'];
+  /* 内容来源取"版本最高"的那个：页面自带 content.js / 本机缓存 /（稍后云端再覆盖）。
+     为什么要比版本：本机缓存可能是旧的，旧缓存盖住新内容 ⇒ 擦除指令永远不跑
+     ⇒ 他会一直看到旧待办（E171 同族坑，2026-11-23 堵）。 */
+  try {
+    var lc = JSON.parse(localStorage.getItem(K.content) || 'null');
+    var fc = window.CONTENT || {};
+    CONT = (lc && lc.version && (!fc.version || lc.version > fc.version)) ? lc : fc;
+  } catch(e){ CONT = window.CONTENT || {}; }
+  try { var p = localStorage.getItem('app-pane'); if (p && PANES.indexOf(p) >= 0) pane = p; } catch(e){}
   try {
     var q = new URLSearchParams(location.search).get('pane');
-    if (q === 'today' || q === 'backlog' || q === 'idea' || q === 'more') pane = q;
+    if (q && PANES.indexOf(q) >= 0) pane = q;
   } catch(e){}
   seedAll();
   render();
