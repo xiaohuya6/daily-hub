@@ -2,16 +2,18 @@
    为什么要有：他要「手机 App」，不是「打开浏览器等网页」——
    装到桌面后断网也得能开、能看今天的任务和账，否则跟网页没区别。
    口径：壳（页面/脚本/图标）缓存优先；云端数据 data.enc.json 网络优先（拿不到就用上次那份）。 */
-var CACHE = 'hub-app-20261123-2';   /* 🔴 改 app.html/content.js 必须同时升这里，否则他手机吃的还是旧缓存 */
+var CACHE = 'hub-app-20261123-3';   /* 🔴 改 app.html/content.js 必须同时升这里，否则他手机吃的还是旧缓存 */
 var SHELL = [
   './',
   './app.html',
+  './content.js',
   './assets/hero.jpg',
   './assets/avatar-her.png',
   './hub-sync.js',
   './manifest.webmanifest',
   './icon-192.png',
-  './icon-512.png'
+  './icon-512.png',
+  './icon-maskable-512.png'
 ];
 
 self.addEventListener('install', function (e) {
