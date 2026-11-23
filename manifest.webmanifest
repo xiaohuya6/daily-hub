@@ -18,7 +18,8 @@
     { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
+    { "name": "记账", "short_name": "记账", "url": "./app.html?pane=spend" },
     { "name": "待办", "short_name": "待办", "url": "./app.html?pane=backlog" },
-    { "name": "想法", "short_name": "想法", "url": "./app.html?pane=idea" }
+    { "name": "每日任务", "short_name": "每日", "url": "./app.html?pane=routine" }
   ]
 }
