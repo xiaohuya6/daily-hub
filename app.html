@@ -323,7 +323,8 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
   'use strict';
   var PASS = '我爱凌波';            /* 只用于解密云端备份，不做界面门槛（红线 #125） */
   var K = { notes:'v2-notes', spend:'v2-spend', routine:'v2-routines', content:'v2-content',
-            seeded:'app-seeded', pruned:'app-pruned', pushSeen:'app-push-seen', routineSeeded:'app-routine-seeded' };
+            seeded:'app-seeded', pruned:'app-pruned', pushSeen:'app-push-seen', routineSeeded:'app-routine-seeded',
+            routineDropped:'app-routine-dropped' };
   var CONT = {}, pane = 'today', SYNCING = true;
 
   function load(k){ try { var a = JSON.parse(localStorage.getItem(k) || '[]'); return Array.isArray(a) ? a : []; } catch(e){ return []; } }
@@ -493,6 +494,29 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
     return added;
   }
 
+  /* ── 一次性删每日任务（云端 routineDrop 下发，同一个 version 不重跑）────
+     🔴 为什么需要这个：applyRoutines 只加不删（判重表 seen 只增不减），
+        所以"砍条目"光把 routinesSeed 里那行删掉是没用的 —— 他设备上已经种进去
+        的那条会永远留着。和待办 539 条是同一个病（错误清单 E170），解法也一样：
+        云端显式点名要删的 id / body，跑一次记个 version 标记。
+     🔴 他 2026-11-23 原话：「那个接缝可以砍了，三角洲可以砍了。」
+     顺序：必须在 applyRoutines **之前**跑（先删后种）。
+     ⚠️ 故意不动 K.routineSeeded：清了它，他手动删掉的 seed 条目会复活。 */
+  function applyRoutineDrop(){
+    var d = CONT.routineDrop;
+    if (!d || !d.version) return 0;
+    try { if (localStorage.getItem(K.routineDropped) === d.version) return 0; } catch(e){}
+    var ids = {}, bodies = {}, rows = load(K.routine), before = rows.length;
+    (d.ids || []).forEach(function(x){ ids[String(x)] = 1; });
+    (d.bodies || []).forEach(function(x){ bodies[String(x)] = 1; });
+    rows = rows.filter(function(r){ return !(ids[r.id] || bodies[r.body]); });
+    var cut = before - rows.length;
+    if (cut) save(K.routine, rows);
+    try { localStorage.setItem(K.routineDropped, d.version); } catch(e){}
+    try { console.log('[hub] 每日任务清理 v' + d.version + '：' + before + ' → ' + rows.length); } catch(e){}
+    return cut;
+  }
+
   /* ── 我推给他的待办 / 任务：按 id 幂等，永不重复堆积 ──────────────
      🔴 以后他跟我说「记一条待办」，我就在 content.js 的 pushItems 里加
         {id:'p20261123a', kind:'backlog', body:'…'}，升 version，发布。同一个 id 只加一次。 */
@@ -515,7 +539,7 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
     try { localStorage.setItem(K.pushSeen, JSON.stringify(seen)); } catch(e){}
     return added;
   }
-  function seedAll(){ applyPrune(); applySeeds(); migrateRoutine(); applyRoutines(); applyPush(); }
+  function seedAll(){ applyPrune(); applySeeds(); migrateRoutine(); applyRoutineDrop(); applyRoutines(); applyPush(); }
 
   /* ── 今天（总览：三块各一张卡，点进去就到对应页） ── */
   function renderToday(){
