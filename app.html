@@ -141,8 +141,11 @@ body.flat .wrap{padding-top:max(10px, env(safe-area-inset-top))}
    390 宽下会凸出来一截） */
 #routineSlot{
   flex:0 0 auto;height:var(--tap);border:1px solid var(--line);border-radius:14px;
-  background:transparent;color:var(--ink2);font-size:13px;padding:0 6px;font-family:inherit;
-  appearance:none;-webkit-appearance:none;text-align:center;cursor:pointer
+  background:transparent;color:var(--ink2);font-size:13px;padding:0 14px 0 6px;font-family:inherit;
+  appearance:none;-webkit-appearance:none;text-align:center;cursor:pointer;
+  /* 去掉默认箭头后补一个小 V —— 不然他看着就是个普通方框，不知道能点（2026-11-24） */
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 9 9'><path d='M1.5 3 4.5 6 7.5 3' fill='none' stroke='%239a9a9a' stroke-width='1.1' stroke-linecap='round'/></svg>");
+  background-repeat:no-repeat;background-position:right 3px center
 }
 /* 记账·「是不是我的支出」（他 11-21 20:18 原话：哪些是我的支出弄一个栏目打勾，
    不是的点否，后面写是谁的、干什么） */
