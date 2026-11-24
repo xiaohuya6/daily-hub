@@ -137,6 +137,13 @@ body.flat .wrap{padding-top:max(10px, env(safe-area-inset-top))}
 .form input::placeholder{color:var(--ink3)}
 #amt{flex:0 0 92px;text-align:right;font-variant-numeric:tabular-nums}
 #note,#backNew,#ideaNew,#routineNew{flex:1}
+/* 「加一条」右边那个时段下拉（他 2026-11-24 要自己加任务；不加这段就用浏览器默认样式，
+   390 宽下会凸出来一截） */
+#routineSlot{
+  flex:0 0 auto;height:var(--tap);border:1px solid var(--line);border-radius:14px;
+  background:transparent;color:var(--ink2);font-size:13px;padding:0 6px;font-family:inherit;
+  appearance:none;-webkit-appearance:none;text-align:center;cursor:pointer
+}
 /* 记账·「是不是我的支出」（他 11-21 20:18 原话：哪些是我的支出弄一个栏目打勾，
    不是的点否，后面写是谁的、干什么） */
 .chk{display:flex;align-items:center;gap:9px;padding:0 2px 10px;cursor:pointer;
@@ -280,6 +287,12 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
       <ul class="list" id="listRoutine"></ul>
       <form class="form" id="routineForm">
         <input id="routineNew" placeholder="加一条每天做的" autocomplete="off">
+        <select id="routineSlot" aria-label="加在哪个时段">
+          <option value="am">上午</option>
+          <option value="pm">下午</option>
+          <option value="night">晚上</option>
+          <option value="noon" selected>随时</option>
+        </select>
         <button class="btn" type="submit">加</button>
       </form>
       <div class="note">勾上就算今天做了。第二天自动归零，不用手动清。</div>
@@ -380,7 +393,7 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
   var PASS = '我爱凌波';            /* 只用于解密云端备份，不做界面门槛（红线 #125） */
   var K = { notes:'v2-notes', spend:'v2-spend', routine:'v2-routines', content:'v2-content',
             seeded:'app-seeded', pruned:'app-pruned', pushSeen:'app-push-seen', routineSeeded:'app-routine-seeded',
-            routineDropped:'app-routine-dropped' };
+            routineDropped:'app-routine-dropped', routineTrash:'app-routine-trash' };
   var CONT = {}, pane = 'today', SYNCING = true;
 
   function load(k){ try { var a = JSON.parse(localStorage.getItem(k) || '[]'); return Array.isArray(a) ? a : []; } catch(e){ return []; } }
@@ -535,6 +548,7 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
         }
       }
       if (seen[id]) continue;
+      if (isTrashed({ id: id, body: body })){ seen[id] = 1; continue; }   /* 他删过的不重种 */
       var dup = false;
       for (var j = 0; j < rows.length; j++){
         /* 按 id 或 body 任一相同都算重复 —— body 那半是为了接住"迁移过来的旧条目
@@ -690,6 +704,42 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
     }
     return null;
   }
+  /* ══ 黑名单：他删过的每日任务，任何地方都不许再补回来（2026-11-24 他亲口「有一些我觉得
+     没有用的我删不掉」）═══════════════════════════════════════════════
+     根因不是删的代码写错了，是删只删了本地（v2-routines）；云端 data.json 顶层 routines
+     那份还在，每次打开 hub-sync 的 mergeInto「只补不删」→ 又推回来 → 他看着像删不掉。
+     解法：删的同一刻把 {id, body} 记进黑名单，凡是「从别处往本地补」的路径
+     （云端 mergeInto / 重新种种子）都先过一遍这名单。 */
+  function trashList(){
+    var a = readJSON(K.routineTrash);
+    return Array.isArray(a) ? a : [];
+  }
+  function trashAdd(rows){
+    var t = trashList(), hit = false;
+    (rows || []).forEach(function(r){
+      if (!r) return;
+      var id = String(r.id || ''), body = String(r.body || '');
+      for (var i = 0; i < t.length; i++){ if (t[i] && t[i].id === id) return; }
+      t.push({ id: id, body: body, at: new Date().toISOString() });
+      hit = true;
+    });
+    if (hit){ try { localStorage.setItem(K.routineTrash, JSON.stringify(t)); } catch(e){} }
+  }
+  function isTrashed(row){
+    if (!row) return false;
+    var id = String(row.id || ''), body = String(row.body || ''), t = trashList();
+    for (var i = 0; i < t.length; i++){
+      if (!t[i]) continue;
+      /* id 相同 = 同一条；id 变了但正文一字不差也算（防"换个 id 又冒出来"）。
+         他手加的条目走 routineForm 直接进库，不经过这里，不会被误拦。 */
+      if (t[i].id === id) return true;
+      if (body && t[i].body === body) return true;
+    }
+    return false;
+  }
+  window.__HUB_IS_DROPPED = isTrashed;                    /* hub-sync 补云端前问这一句 */
+  window.__HUB_TRASH_MERGE = function(list){ trashAdd(list); };
+
   function slotOf(s){ return (s && s.slot && SLOT_NAME[s.slot]) ? s.slot : 'noon'; }
   function showOn(s, day){
     if (!s || !s.dow) return true;                 /* 没写 dow = 每天都出 */
@@ -727,7 +777,9 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
     }
     /* 按时段分组；空组连标题都不画（周末那半天只剩生活线，也不会留个空壳） */
     var groups = { am:[], pm:[], night:[], noon:[] };
-    rows.forEach(function(r){ groups[slotOf(seedMeta(r.id))].push(r); });
+    /* 时段来源：① 下发的 seed 带 slot 就用它（改规则不动本地数据）
+                  ② 你自己在 App 里加的那条，用那条自己身上的 slot（2026-11-24 加的） */
+    rows.forEach(function(r){ groups[slotOf(seedMeta(r.id) || r)].push(r); });
     SLOT_ORDER.forEach(function(k){
       if (!groups[k].length) return;
       var hd = document.createElement('li');
@@ -749,7 +801,9 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
         var x = document.createElement('button');
         x.className = 'erase'; x.type = 'button'; x.textContent = '删';
         x.onclick = function(){
-          save(K.routine, load(K.routine).filter(function(y){ return y.id !== r.id; }));
+          var all = load(K.routine);
+          trashAdd(all.filter(function(y){ return y.id === r.id; }));   /* 先记黑名单，再删 */
+          save(K.routine, all.filter(function(y){ return y.id !== r.id; }));
           renderRoutine();
           if (pane === 'today') renderToday();
         };
@@ -1051,8 +1105,8 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
     var rows = load(K.routine), out = {};
     for (var i = 0; i < 7; i++){
       out[i] = routineToday(rows, i).map(function(r){
-        var s = seedMeta(r.id);
-        return { id: r.id, slot: (s ? slotOf(s) : 'noon'), body: String(r.body).slice(0, 18) };
+        var s = seedMeta(r.id) || r;
+        return { id: r.id, slot: slotOf(s), body: String(r.body).slice(0, 18) };
       });
     }
     return out;
@@ -1145,8 +1199,10 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
   document.getElementById('routineForm').onsubmit = function(e){
     e.preventDefault();
     var v = document.getElementById('routineNew').value.trim(); if (!v) return;
+    var sel = document.getElementById('routineSlot');
+    var slot = (sel && SLOT_NAME[sel.value]) ? sel.value : 'noon';
     var a = load(K.routine);
-    a.push({ id:uid(), body:v, done_on:null, tag:null, created_at:new Date().toISOString() });
+    a.push({ id:uid(), body:v, done_on:null, tag:null, slot:slot, created_at:new Date().toISOString() });
     save(K.routine, a);
     document.getElementById('routineNew').value = '';
     renderRoutine();
