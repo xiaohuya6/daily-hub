@@ -121,12 +121,22 @@
     var o = { schema: 1, updated: new Date().toISOString(), source: 'daily-hub' };
     for (var i = 0; i < KEYS.length; i++) o[KEYS[i]] = readTable(KEYS[i]);
     try { o.content = JSON.parse(localStorage.getItem(LSK.content) || 'null'); } catch (e) { o.content = null; }
+    /* 每日任务的「删过的」黑名单要一起上云 —— 不然换手机 / 清了浏览器，他删过的东西
+       又会被云端那份 routines 补回来（2026-11-24） */
+    try { o.routineTrash = JSON.parse(localStorage.getItem('app-routine-trash') || '[]'); }
+    catch (e) { o.routineTrash = []; }
     return o;
   }
   /* 云端 → 本地：**只补本地没有的**（本地才是他的最新记录，绝不用旧的覆盖新的） */
   function mergeInto(cloud) {
     if (!cloud) return 0;
     var added = 0;
+    /* ① 先把云端的「删过的」黑名单并进本地 —— 必须在这轮补回之前做完，
+          否则下面过滤时本地还不知道他删过什么（2026-11-24） */
+    if (Array.isArray(cloud.routineTrash) && cloud.routineTrash.length
+        && window.__HUB_TRASH_MERGE) {
+      try { window.__HUB_TRASH_MERGE(cloud.routineTrash); } catch (e) {}
+    }
     for (var i = 0; i < KEYS.length; i++) {
       var k = KEYS[i];
       if (!Array.isArray(cloud[k]) || !cloud[k].length) continue;
@@ -139,6 +149,9 @@
         if (!row) continue;
         var key = row.id || (row.day + '|' + row.kind + '|' + row.body);
         if (seen[key]) continue;
+        /* 🔴 他删过的每日任务，云端不许补回来（2026-11-24 他亲口「有一些我觉得没有用的
+           我删不掉」—— 根因就是这一行原来没有，删了本地又被云端推回来） */
+        if (k === 'routines' && window.__HUB_IS_DROPPED && window.__HUB_IS_DROPPED(row)) continue;
         seen[key] = 1; mine.push(row); added++;
       }
       if (added) writeTable(k, mine);
